@@ -295,33 +295,7 @@
 .session-item.needs-question .s-title { color: var(--accent); font-weight: 600; }
 * { box-sizing: border-box; }
 :root {
-  /* paper-light (default) — warm minimalism, terracotta accent */
-  --bg: #f4efe8; --panel: #fbf8f3; --panel-2: #efe8dd;
-  --border: #e2d8ca; --text: #2b2620; --muted: #8a7f6f;
-  --accent: #c9634e; --accent-soft: #f3ddd6;
-  --code-bg: #efe8dd; --user-bubble: #eef3fc; --user-bubble-border: #d8e3f5;
-  --plan-toggle: #eab308; --act-toggle: #22c55e;
-  --plan-bubble: rgba(253,230,138,0.42); --plan-bubble-border: rgba(250,204,21,0.42);
-  --act-bubble: rgba(187,247,208,0.42); --act-bubble-border: rgba(74,222,128,0.42);
-  --ok: #1a7f37; --err: #cf222e; --warn: #9a6700;
-  --shadow: 0 8px 30px rgba(60,45,30,.10);
-  --scroll-thumb: rgba(0,0,0,.18); --scroll-thumb-hover: rgba(0,0,0,.32);
-}
-[data-theme="dark"] {
-  /* paper-dark — warm minimalism, dark */
-  --bg: #181818; --panel: #1e1e1e; --panel-2: #252525;
-  --border: #323232; --text: #e6e6e6; --muted: #8e8e8e;
-  --accent: #c9634e; --accent-soft: #2d2927;
-  --code-bg: #252525; --user-bubble: #262c38; --user-bubble-border: #333b4c;
-  --plan-toggle: #c99a2e; --act-toggle: #10b981;
-  --plan-bubble: rgba(201,154,46,0.06); --plan-bubble-border: rgba(201,154,46,0.22);
-  --act-bubble: rgba(52,211,153,0.06); --act-bubble-border: rgba(52,211,153,0.22);
-  --ok: #3fb950; --err: #f85149; --warn: #d29922;
-  --shadow: 0 10px 34px rgba(0,0,0,.4);
-  --scroll-thumb: rgba(255,255,255,.16); --scroll-thumb-hover: rgba(255,255,255,.3);
-}
-[data-theme="forest"] {
-  /* forest-light — calm sage/green, natural, muted */
+  /* forest-light (default) — calm sage/green, natural, muted */
   --bg: #eef3ee; --panel: #f7faf7; --panel-2: #e2ece3;
   --border: #cfe0d2; --text: #20302a; --muted: #6f8579;
   --accent: #4f8a6b; --accent-soft: #d6e8dc;
@@ -333,7 +307,7 @@
   --shadow: 0 10px 30px rgba(40,80,60,.10);
   --scroll-thumb: rgba(0,0,0,.18); --scroll-thumb-hover: rgba(0,0,0,.32);
 }
-[data-theme="forest-dark"] {
+[data-theme="dark"] {
   /* forest-dark — calm sage/green, dark */
   --bg: #101211; --panel: #171a18; --panel-2: #1e2120;
   --border: #2e322f; --text: #e0e2e0; --muted: #858a85;
@@ -1568,18 +1542,18 @@ body.resizing-h iframe { pointer-events: none; }
 .chip:active { transform: scale(.97); }
 .chip.sent { opacity: .55; cursor: default; pointer-events: none; }
 /* dark theme: brighter fills so the pills stay readable on the dark bg */
-[data-theme="dark"] .chip-act, [data-theme="forest-dark"] .chip-act {
+[data-theme="dark"] .chip-act {
   color: var(--act-toggle);
   background: color-mix(in srgb, var(--act-toggle) 8%, transparent);
   border-color: color-mix(in srgb, var(--act-toggle) 30%, transparent);
 }
-[data-theme="dark"] .chip-plan, [data-theme="forest-dark"] .chip-plan {
+[data-theme="dark"] .chip-plan {
   color: var(--plan-toggle);
   background: color-mix(in srgb, var(--plan-toggle) 8%, transparent);
   border-color: color-mix(in srgb, var(--plan-toggle) 30%, transparent);
 }
-[data-theme="dark"] .chip-act:hover, [data-theme="forest-dark"] .chip-act:hover { background: color-mix(in srgb, var(--act-toggle) 14%, transparent); }
-[data-theme="dark"] .chip-plan:hover, [data-theme="forest-dark"] .chip-plan:hover { background: color-mix(in srgb, var(--plan-toggle) 14%, transparent); }
+[data-theme="dark"] .chip-act:hover { background: color-mix(in srgb, var(--act-toggle) 14%, transparent); }
+[data-theme="dark"] .chip-plan:hover { background: color-mix(in srgb, var(--plan-toggle) 14%, transparent); }
 
 /* files touched this turn — collapsed count line, expands to the chips */
 .msg-files { margin-top: 6px; }
@@ -1782,8 +1756,7 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
 #mode-toggle .mode-btn[data-mode="plan"].active { background: var(--plan-toggle); }
 #mode-toggle .mode-btn[data-mode="act"].active { background: var(--act-toggle); }
 /* dark-mode pills are bright (gold/emerald) → dark text for contrast */
-[data-theme="dark"] #mode-toggle .mode-btn.active,
-[data-theme="forest-dark"] #mode-toggle .mode-btn.active { color: #0b0e13; }
+[data-theme="dark"] #mode-toggle .mode-btn.active { color: #0b0e13; }
 
 /* ── right panel: two stacked panes — upper: Files/Preview,
       lower: Thinking/Terminal/Editor (Cline-style auto tabs) ── */
@@ -2071,12 +2044,10 @@ a.file-link:hover { border-color: var(--accent); color: var(--accent); }
 a.link-verified { color: var(--accent); }
 span.link-broken { color: var(--muted); text-decoration: line-through; cursor: help; }
 
-/* theme icon toggle — 4 variants */
-.ti-light, .ti-dark, .ti-forest, .ti-forest-dark { display: none; }
+/* theme icon toggle — 2 variants */
+.ti-light, .ti-dark { display: none; }
 [data-theme="light"] .ti-light { display: inline; }
 [data-theme="dark"] .ti-dark { display: inline; }
-[data-theme="forest"] .ti-forest { display: inline; }
-[data-theme="forest-dark"] .ti-forest-dark { display: inline; }
 
 @media (max-width: 900px) {
   .vsplit { display: none; }
