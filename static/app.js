@@ -140,8 +140,7 @@
     approvalBanner: $("approval-banner"), bannerText: $("banner-text"), bannerView: $("banner-view"),
     bannerMark: $("banner-mark"), bannerPill: $("banner-pill"),
     chatScroll: $("chat-scroll"), welcome: $("welcome"),
-    welcomeMark: $("welcome-mark"), wmSmaller: $("welcome-mark-smaller"),
-    wmBigger: $("welcome-mark-bigger"),
+    welcomeMark: $("welcome-mark"),
     messages: $("messages"),
     attachments: $("attachments"), attachBtn: $("attach-btn"), fileInput: $("file-input"),
     input: $("input"), sendBtn: $("send-btn"), stopBtn: $("stop-btn"), composerHint: $("composer-hint"),
@@ -484,23 +483,12 @@
   function hideWelcome() { el.welcome.hidden = true; }
   function showWelcome() { el.welcome.hidden = false; }
 
-  // ── Welcome robot size (− / ＋, persisted) ─────────────────────
-  const WM_MIN = 28, WM_MAX = 160, WM_STEP = 16;
-  let wmPx = parseInt(localStorage.getItem("muji.welcomeMark") || "44", 10);
-  if (isNaN(wmPx)) wmPx = 44;
-  wmPx = Math.min(WM_MAX, Math.max(WM_MIN, wmPx));
-  function applyWelcomeMark() {
+  // ── Welcome robot (fixed at max size, no − / ＋) ───────────────
+  const WM_MAX = 160;
+  (function applyWelcomeMark() {
     const img = el.welcomeMark.querySelector("img");
-    img.style.width = img.style.height = wmPx + "px";
-    localStorage.setItem("muji.welcomeMark", String(wmPx));
-  }
-  applyWelcomeMark();
-  el.wmSmaller.addEventListener("click", () => {
-    wmPx = Math.max(WM_MIN, wmPx - WM_STEP); applyWelcomeMark();
-  });
-  el.wmBigger.addEventListener("click", () => {
-    wmPx = Math.min(WM_MAX, wmPx + WM_STEP); applyWelcomeMark();
-  });
+    img.style.width = img.style.height = WM_MAX + "px";
+  })();
   function scrollToBottom(force) {
     if (force || !state.userScrolledUp) {
       if (force)

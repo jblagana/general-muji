@@ -1186,10 +1186,8 @@ body.resizing-h iframe { pointer-events: none; }
 .scroll-bottom-btn:hover { color: var(--accent); border-color: var(--accent); }
 .scroll-bottom-btn:active { transform: scale(.92); }
 .welcome { text-align: center; padding: 12vh 10px 0; }
-.welcome-mark { display: inline-flex; align-items: center; gap: 6px; }
-.welcome-mark img { width: 44px; height: 44px; display: block; }
-.welcome-mark .wm-size { opacity: .5; }
-.welcome-mark .wm-size:hover { opacity: 1; }
+.welcome-mark { display: inline-flex; align-items: center; }
+.welcome-mark img { width: 160px; height: 160px; display: block; }
 .welcome h1 { font-size: 24px; margin: 10px 0 6px; }
 .welcome-sub { color: var(--muted); font-size: 14px; }
 
