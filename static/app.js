@@ -6891,8 +6891,10 @@
   });
   el.addWorkspace.addEventListener("click", addWorkspace);
   el.themeToggle.addEventListener("click", () => {
-    const cur = document.documentElement.getAttribute("data-theme");
-    applyTheme(cur === "dark" ? "light" : "dark");
+    const order = ["light", "dark", "forest", "forest-dark"];
+    const cur = document.documentElement.getAttribute("data-theme") || "light";
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    applyTheme(next);
   });
   el.modeToggle.querySelectorAll(".mode-btn").forEach((b) => {
     b.addEventListener("click", () => {
