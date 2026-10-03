@@ -6374,8 +6374,26 @@
           return r.json();
         })
         .then(() => {
-          showStatus("ok", "✓ Saved — reloading…");
-          setTimeout(() => location.reload(), 800);
+          // .env is read at import time — the running server still sees the
+          // old (unset) key, so a plain reload would just re-show this card.
+          // Restart the server (user-initiated save = explicit consent), wait
+          // for it to come back, then reload into a configured app.
+          showStatus("loading", "Saved — restarting server…");
+          return fetch("/api/restart", { method: "POST" })
+            .catch(() => {}) // server exits immediately after spawning its successor
+            .then(() => new Promise((resolve) => {
+              const t0 = Date.now();
+              const poll = () => {
+                fetch("/api/health", { cache: "no-store" })
+                  .then((r) => (r.ok ? resolve() : poll()))
+                  .catch(() => (Date.now() - t0 > 30000 ? resolve() : poll()));
+              };
+              setTimeout(poll, 1200);
+            }));
+        })
+        .then(() => {
+          showStatus("ok", "✓ Connected — loading…");
+          setTimeout(() => location.reload(), 400);
         })
         .catch((e) => {
           showStatus("err", "✕ " + e.message);
