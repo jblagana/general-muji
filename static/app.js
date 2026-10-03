@@ -4352,12 +4352,10 @@
   }
 
   function initTheme() {
-    // Forest themes were dropped — remap any old saved value to light/dark.
     const saved = localStorage.getItem("muji.theme");
-    const mapped = saved === "forest" ? "light" : saved === "forest-dark" ? "dark" : saved;
     const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark" : "light";
-    applyTheme(mapped || preferred);
+    applyTheme(saved || preferred);
   }
 
   // ── Preview panel ─────────────────────────────────────────────
@@ -6911,8 +6909,10 @@
   });
   el.addWorkspace.addEventListener("click", addWorkspace);
   el.themeToggle.addEventListener("click", () => {
+    const order = ["light", "dark", "forest", "forest-dark"];
     const cur = document.documentElement.getAttribute("data-theme") || "light";
-    applyTheme(cur === "light" ? "dark" : "light");
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    applyTheme(next);
   });
   el.modeToggle.querySelectorAll(".mode-btn").forEach((b) => {
     b.addEventListener("click", () => {
