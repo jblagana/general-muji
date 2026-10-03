@@ -26,6 +26,10 @@ if not exist ".env" (
   )
 )
 
+rem Read the configured port from .env (default 8321) so start.bat respects it.
+set "PORT=8321"
+for /f "usebackq delims=" %%p in (`powershell -NoProfile -Command "$m=Select-String -Path .env -Pattern 'PORT=' -ErrorAction SilentlyContinue | Select-Object -First 1; if($m){ ($m.Line -split '=',2)[1].Trim() }"`) do set "PORT=%%p"
+
 rem First run: drop a permanent desktop shortcut (idempotent - only if missing).
 rem Uses the shell Desktop folder so OneDrive-redirected desktops still work.
 powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $p=Join-Path $d 'general-muji.lnk'; if(-not (Test-Path $p)){ $s=(New-Object -ComObject WScript.Shell).CreateShortcut($p); $s.TargetPath='%~dp0start.bat'; $s.WorkingDirectory='%~dp0'; $s.Description='muji - local agent'; $s.IconLocation='%~dp0static\favicon.ico'; $s.Save(); Write-Host 'Created desktop shortcut: general-muji.lnk' }"
@@ -55,16 +59,16 @@ if errorlevel 1 (
 
 echo [3/3] Starting server...
 
-powershell -NoProfile -Command "try { $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', 8321); exit 1 } catch { exit 0 }" >nul 2>nul
+powershell -NoProfile -Command "try { $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', %PORT%); exit 1 } catch { exit 0 }" >nul 2>nul
 if errorlevel 1 (
   echo Server is already running - opening the browser.
-  start "" "http://127.0.0.1:8321"
+  start "" "http://127.0.0.1:%PORT%"
   timeout /t 3 >nul
   exit /b 0
 )
 
 timeout /t 2 /nobreak >nul
-start "" "http://127.0.0.1:8321"
+start "" "http://127.0.0.1:%PORT%"
 ".venv\Scripts\python.exe" server.py
 echo.
 echo Server stopped.
