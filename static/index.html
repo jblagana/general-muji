@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>muji</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png?v=23"/>
+  <link rel="icon" href="/static/favicon.ico?v=23" sizes="any"/>
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v=3"/>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#F5F1EA"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)" id="hljs-light"/>
+  <link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark"/>
+  <link rel="stylesheet" href="/static/vendor/katex.min.css"/>
+  <link rel="stylesheet" href="/static/style.css?v=133"/>
+</head>
+<body>
+<!-- Splash: shown on first paint (PWA cold-start), hidden by app.js once
+     the app is ready. Inline-critical look comes from style.css (blocking
+     in <head>), so no FOUC of an unstyled splash. -->
+<div id="splash" aria-hidden="true">
+  <div class="splash-word">muji<span class="splash-dot">.</span></div>
+</div>
+<!-- Global fallback banner: a background chat is waiting (question/approval)
+     — mark + title + countdown pill + View -->
+<div class="approval-banner" id="approval-banner" hidden>
+  <div class="ab-head">
+    <span class="mark" id="banner-mark"></span>
+    <span class="banner-text" id="banner-text"></span>
+    <span class="ab-pill" id="banner-pill" hidden></span>
+  </div>
+  <button class="btn primary" id="banner-view">View</button>
+</div>
+<!-- Offline banner: muji server unreachable -->
+<div class="offline-banner" id="offline-banner" hidden>⚠ muji server offline — reconnect to continue</div>
+<div id="app" class="app">
+  <!-- Sidebar: workspaces → chats -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <div class="brand"><img class="brand-mark" src="/static/favicon.png?v=23" alt="" width="20" height="20"/><span class="brand-name" id="brand-title">muji</span></div>
+      <button class="icon-btn" id="sidebar-close" title="Close sidebar" aria-label="Close sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+    <button class="new-chat-btn" id="new-chat">＋&nbsp; New chat</button>
+    <div class="sidebar-label">
+      <span>Workspaces</span>
+      <button class="mini-btn" id="add-workspace" title="Add a workspace folder">＋</button>
+    </div>
+    <nav class="ws-list" id="ws-list"></nav>
+    <div class="sidebar-label chats-label">
+      <span id="ws-label">Chats</span>
+      <button class="mini-btn" id="chats-menu" title="Chat options">⋯</button>
+      <div class="chats-menu" id="chats-menu-pop" hidden>
+        <button class="cm-item" id="deleted-chats" title="Recently deleted chats (last 30 days)">Deleted chats</button>
+        <hr class="cm-sep"/>
+        <button class="cm-item danger" id="clear-all" title="Delete all chats">Clear all</button>
+        <button class="cm-item danger" id="clear-archived" title="Delete archived (old, unpinned) chats">Clear archived</button>
+      </div>
+    </div>
+    <div class="search-row">
+      <input class="search-input" id="chat-search" type="search" placeholder="Filter chats…" autocomplete="off" spellcheck="false"/>
+    </div>
+    <nav class="session-list" id="session-list"></nav>
+    <!-- Approvals panel (destructive-only) -->
+    <div class="auto-approve" id="auto-approve">
+      <button class="aa-head" id="aa-toggle" title="When muji asks for approval before acting">
+        <span class="aa-label" id="aa-label">Approvals: destructive only</span><span class="aa-chev">⌄</span>
+      </button>
+      <div class="aa-body" id="aa-body" hidden>
+        <div class="aa-sub" id="aa-sub">muji acts on its own for read, edit, commands, web, and browser — it only stops to confirm destructive operations:</div>
+        <label class="aa-item"><input type="checkbox" data-cat="destructive"/><span>🗑️&nbsp; Destructive ops (delete / remove / rename / move)</span></label>
+        <label class="aa-item"><input type="checkbox" data-cat="auto_resume"/><span>↻&nbsp; Auto-resume interrupted tasks after a crash/restart</span></label>
+      </div>
+    </div>
+    <div class="sidebar-foot">
+      <div class="meta-line" id="root-line" title="Agent file root"></div>
+      <div class="meta-line" id="model-line" title="Model endpoint"></div>
+      <button class="mini-btn" id="restart-server" title="Restart the server to load the latest code" style="width:100%;margin-top:6px">⟳&nbsp; Restart server</button>
+    </div>
+  </aside>
+
+  <!-- Draggable divider: sidebar | chat -->
+  <div class="vsplit" id="sidebar-resize" title="Drag to resize · double-click to reset"></div>
+
+  <!-- Today drawer (v4, Boss's edit): full-height panel riding the sidebar's
+       right edge; compact vertical tab (dot + TODAY) flush on the box's
+       right edge. One rigid unit slides — closed: the box hides behind the
+       sidebar, the tab peeks past its edge as the affordance. See
+       .tz-drawer in style.css. -->
+  <div class="tz-drawer open" id="tz-drawer">
+    <div class="tz-box">
+      <div class="tz-head" id="tz-head">
+        <span class="tz-title" id="tz-title">TODAY</span>
+        <span class="tz-count" id="tz-count" hidden>0</span>
+        <button class="tz-x" id="tz-close" title="Close" aria-label="Close today drawer">✕</button>
+      </div>
+      <div class="tz-body" id="tz-body"></div>
+    </div>
+    <button class="tz-tab" id="tz-tab" title="Toggle today drawer" aria-label="Toggle today drawer">
+      <span class="tz-dot"></span><span class="tz-lbl">Today</span>
+    </button>
+  </div>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="sidebar-open" title="Open sidebar" aria-label="Open sidebar" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="topbar-title" id="topbar-title"></div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="chat-collapse" title="Collapse chat" aria-label="Collapse chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+        </button>
+        <button class="icon-btn" id="preview-toggle" title="Toggle right panel" aria-label="Toggle right panel">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg>
+        </button>
+        <button class="icon-btn" id="theme-toggle" title="Toggle theme">
+          <span class="ti-light">☀</span><span class="ti-dark">☾</span>
+        </button>
+        <button class="icon-btn" id="learn-open" title="Review learned patterns (learned.md) — activate / veto / deactivate">&#129504;</button>
+        <button class="icon-btn" id="wench-open" title="Review tool quirks (tool_notes.md) — verified API behaviors, activate / veto / deactivate">&#128295;</button>
+        <button class="icon-btn" id="lat-open" title="Model speed — day × hour heatmap (recomputed live from the events table)">&#9201;</button>
+      </div>
+    </header>
+
+    <!-- Job progress: plan steps (STEP:) when declared, honest phase bar otherwise -->
+    <div class="progress" id="progress" hidden>
+      <div class="progress-head">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <span class="progress-label" id="progress-label"></span>
+      </div>
+      <div class="progress-steps" id="progress-steps"></div>
+    </div>
+
+    <!-- Pinned job: concise goal of the ongoing run (below the progress bar) -->
+    <div class="job-strip" id="job-strip" hidden>
+      <span class="job-dot"></span>
+      <span class="job-text" id="job-text"></span>
+    </div>
+
+    <div class="chat-scroll" id="chat-scroll">
+      <div class="chat-column" id="chat-column">
+        <div class="welcome" id="welcome">
+          <div class="welcome-mark" id="welcome-mark">
+            <button class="mini-btn wm-size" id="welcome-mark-smaller" title="Smaller robot">−</button>
+            <img src="/static/favicon.png?v=23" alt="" width="44" height="44"/>
+            <button class="mini-btn wm-size" id="welcome-mark-bigger" title="Bigger robot">＋</button>
+          </div>
+          <h1 id="welcome-title">What can I do for you?</h1>
+          <p class="welcome-sub" id="welcome-sub">Ask anything, attach files, or request a task. Files I write open in the preview panel.</p>
+        </div>
+        <div class="messages" id="messages"></div>
+        <!-- Session-switch toast: brief "you're now in THIS chat" pill,
+             floats above the composer (absolute, no layout shift) -->
+        <div class="session-toast" id="session-toast" aria-live="polite">
+          <span class="st-pill">
+            <img src="/static/favicon.png?v=23" alt="" width="22" height="22"/>
+            <span class="st-name" id="session-toast-name"></span>
+          </span>
+        </div>
+        <div class="composer" id="composer">
+          <div class="attachments" id="attachments"></div>
+          <div class="learn-banner" id="learn-banner" hidden>
+            <div class="learn-head">
+              <span class="learn-ic" title="Learned patterns &#8212; muji's human-gated memory">&#129504;</span>
+              <span class="learn-count" id="learn-count"></span>
+              <button class="mini-btn" id="learn-review-btn" title="Review pending patterns">Review</button>
+              <button class="mini-btn" id="learn-later-btn" title="Hide &#8212; I'll review later">Later</button>
+            </div>
+            <div class="learn-list" id="learn-list" hidden></div>
+          </div>
+          <div class="learn-banner" id="wench-banner" hidden>
+            <div class="learn-head">
+              <span class="learn-ic" title="Tool quirks &#8212; verified tool behaviors (tool_notes.md)">&#128295;</span>
+              <span class="learn-count" id="wench-count"></span>
+              <button class="mini-btn" id="wench-review-btn" title="Review pending quirks">Review</button>
+              <button class="mini-btn" id="wench-later-btn" title="Hide &#8212; I'll review later">Later</button>
+            </div>
+            <div class="learn-list" id="wench-list" hidden></div>
+          </div>
+          <div class="composer-status" id="composer-status" hidden>
+            <button class="status-chip resume-chip" id="resume-chip" title="The last message has no reply — continue where the run stopped">↻ Resume</button>
+            <button class="status-chip abandon-chip" id="abandon-chip" title="Drop the unfinished task and move on — the chat stays, the run is forgotten">✕ Start fresh</button>
+            <span class="status-chip queue-chip" id="queue-chip" title="Messages waiting for the current run to finish — they run in order" hidden></span>
+          </div>
+          <div class="input-wrap">
+            <textarea id="input" class="input" rows="1" placeholder="Message muji…"></textarea>
+            <button class="send-btn" id="send-btn" title="Send" aria-label="Send" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+            </button>
+            <button class="send-btn stop-btn" id="stop-btn" title="Stop" aria-label="Stop" hidden>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3.5"/></svg>
+            </button>
+          </div>
+          <div class="composer-foot">
+            <div class="cf-left">
+              <button class="icon-btn attach-btn" id="attach-btn" title="Attach a file" aria-label="Attach a file">📎</button>
+              <span class="composer-hint" id="composer-hint">muji can make mistakes. Verify important results.</span>
+            </div>
+            <div class="mode-toggle" id="roast-toggle" title="Roast level (per chat): 😴 off · 😏 chill · 🔥 full">
+              <button class="mode-btn" data-roast="off" title="😴 Off — no roasts, work only">😴</button>
+              <button class="mode-btn active" data-roast="chill" title="😏 Chill — one sharp line, work first">😏</button>
+              <button class="mode-btn" data-roast="full" title="🔥 Full — the full roast dispenser">🔥</button>
+            </div>
+            <div class="mode-toggle" id="mode-toggle" title="Plan: research only, no changes · Act: full access (per chat)">
+              <button class="mode-btn" data-mode="plan" title="Plan mode — no files written or commands run">Plan</button>
+              <button class="mode-btn active" data-mode="act" title="Act mode — full access">Act</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Watch strip (the supervisor): thin always-on herd view of every
+         background run — green when healthy, amber/red pulse when stuck
+         or waiting. Click to expand the board (per-run rows + open /
+         stop+resume — the stop is always the user's click). -->
+    <div class="sup-strip" id="sup-strip" title="watch — all background runs">
+      <span class="sup-dot" id="sup-dot"></span>
+      <span class="sup-title">watch</span>
+      <span class="sup-summary" id="sup-summary">…</span>
+      <span class="sup-chev">▾</span>
+    </div>
+    <div class="sup-board" id="sup-board"></div>
+    <input type="file" id="file-input" hidden/>
+    <!-- Floating "scroll to bottom" — appears when scrolled up in the chat -->
+    <button class="scroll-bottom-btn" id="scroll-bottom-btn" title="Scroll to bottom" aria-label="Scroll to bottom" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+    </button>
+  </main>
+
+  <!-- Collapsed chat strip: shows when the main chat area is collapsed -->
+  <button class="chat-strip" id="chat-strip" hidden>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+    <span class="chat-strip-label" id="chat-strip-label">muji</span>
+    <span class="chat-strip-dot" id="chat-strip-dot" hidden></span>
+    <span class="chat-strip-hint">Open chat</span>
+  </button>
+
+  <!-- Draggable divider: chat | right panel -->
+  <div class="vsplit" id="right-resize" title="Drag to resize · double-click to reset"></div>
+
+  <!-- Right panel: two stacked panes per chat. Upper: Thinking / Files /
+       Preview — Thinking auto-activates as the model streams reasoning.
+       Lower: Terminal / Editor — Cline-style auto activation: a tool runs →
+       Terminal, a file is edited → Editor (read-only, syntax-colored).
+       Terminal is writable. -->
+  <aside class="right-panel" id="right-panel">
+    <!-- Top of the panel: the chat's own name — the tab row moved down -->
+    <div class="rp-session-title" id="rp-session-title" title="Current chat">muji</div>
+    <div class="rp-tabs" id="rp-tabs-upper">
+      <button class="rp-tab" id="rp-tab-thinking" data-ru="thinking">Thinking</button>
+      <button class="rp-tab active" id="rp-tab-files" data-ru="files">Files</button>
+      <button class="rp-tab" id="rp-tab-preview" data-ru="preview">Preview</button>
+      <span class="rp-tabs-spacer"></span>
+      <button class="icon-btn" id="rp-close" title="Hide panel" aria-label="Hide panel">✕</button>
+    </div>
+    <div class="rp-main">
+    <div class="rp-pane" id="rp-pane-thinking" hidden>
+      <div class="term" id="think"></div>
+    </div>
+    <div class="rp-pane" id="rp-pane-files" hidden>
+      <div class="rp-section-label rp-tree-head">
+        <span id="rp-tree-label">Workspace</span>
+        <span class="rp-tree-actions">
+          <button class="mini-btn" id="rp-tree-choose" title="Choose the folder this chat works in" hidden>📂</button>
+          <button class="mini-btn" id="rp-tree-newdir" title="New folder in this directory">📁＋</button>
+          <button class="mini-btn" id="rp-tree-newfile" title="New file in this directory">📄＋</button>
+          <button class="mini-btn" id="rp-tree-hidden" title="Show hidden files and folders (.git, .venv, …)">👁</button>
+          <button class="mini-btn" id="rp-tree-up" title="Up one folder" hidden>↑</button>
+          <button class="mini-btn" id="rp-tree-reveal" title="Open this folder in File Explorer (foreground)">↗️</button>
+          <button class="mini-btn" id="rp-tree-refresh" title="Refresh">⟳</button>
+        </span>
+      </div>
+      <div class="tree-paste" id="tree-paste" hidden>
+        <input id="rp-tree-path" type="text" spellcheck="false" autocomplete="off"
+               placeholder="Paste a folder path to open here (outside the root works too)">
+        <button class="mini-btn" id="rp-tree-path-go" title="Set this chat's working folder to the pasted path">Open</button>
+      </div>
+      <div class="tree-pick" id="tree-pick" hidden>
+        <span id="tree-pick-label">Choose the folder this chat works in — browse, then confirm</span>
+        <span class="tree-pick-actions">
+          <button class="mini-btn" id="tree-pick-cancel">✕ Cancel</button>
+          <button class="mini-btn" id="tree-pick-use">✓ Use this folder</button>
+        </span>
+      </div>
+      <div class="tree-dropzone" id="rp-tree-dropzone" hidden>
+        ⬆ Drop here to move out of this folder
+      </div>
+      <div class="rp-tree" id="rp-tree"></div>
+    </div>
+    <div class="rp-pane" id="rp-pane-preview" hidden>
+      <div class="preview-head">
+        <span class="preview-title">
+          <button class="icon-btn" id="preview-back" title="Back to the Files tab">←</button>
+          <span class="preview-name" id="preview-name"></span>
+        </span>
+        <span class="preview-actions">
+          <span class="preview-zoom">
+            <button class="icon-btn" id="preview-zoom-out" title="Zoom out (or Ctrl+scroll down)">−</button>
+            <span class="preview-zoom-level" id="preview-zoom-level" title="Reset zoom to 100%">100%</span>
+            <button class="icon-btn" id="preview-zoom-in" title="Zoom in (or Ctrl+scroll up)">+</button>
+          </span>
+          <a class="icon-btn" id="preview-open" target="_blank" rel="noopener" title="Open in new tab" hidden>↗</a>
+          <a class="icon-btn" id="preview-download" title="Download">⬇</a>
+          <button class="icon-btn" id="preview-reveal" title="Reveal in File Explorer (foreground)" hidden>↗️</button>
+        </span>
+      </div>
+      <div class="preview-body" id="preview-body"></div>
+      <div class="preview-empty" id="preview-empty">Nothing to preview yet.<br>Generated files open here — or pick one in the Files tab.</div>
+    </div>
+    </div>
+    <!-- Draggable divider: upper pane | lower pane (vertical drag) -->
+    <div class="hsplit" id="term-resize" title="Drag to resize the lower pane · double-click to reset"></div>
+    <div class="rp-lower" id="rp-lower">
+      <div class="rp-tabs" id="rp-tabs-lower">
+        <button class="rp-tab active" id="rp-tab-terminal" data-rl="terminal">Terminal</button>
+        <button class="rp-tab" id="rp-tab-editor" data-rl="editor">Editor</button>
+      </div>
+      <div class="rp-lower-body">
+        <div class="rp-pane" id="rp-pane-terminal">
+          <div class="term" id="term"></div>
+          <div class="term-input-row">
+            <span class="term-ps">PS&gt;</span>
+            <input id="term-input" type="text" placeholder="PowerShell command — runs in this chat's folder" autocomplete="off" spellcheck="false">
+            <button class="mini-btn" id="term-run" title="Run" aria-label="Run">⏎</button>
+          </div>
+        </div>
+        <div class="rp-pane" id="rp-pane-editor" hidden>
+          <div class="editor-head" id="editor-head" hidden>
+            <span class="editor-name" id="editor-name"></span>
+            <span class="editor-badge">read-only</span>
+          </div>
+          <pre class="editor-body" id="editor-body" hidden><code id="editor-code"></code></pre>
+          <div class="editor-empty" id="editor-empty">No file open yet.<br>The file being edited shows up here, syntax-colored.</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Deleted-chats drawer (⋯ menu → 'Deleted chats'): read-only list of
+       what got deleted in the last 30 days — title, when, how, restore. -->
+  <!-- Dim layer under the deleted drawer: tap-outside closes it. -->
+  <div class="dd-dim" id="deleted-dim" hidden></div>
+  <aside class="deleted-drawer" id="deleted-drawer" hidden>
+    <div class="dd-head">
+      <span class="dd-title">Deleted chats</span>
+      <span class="dd-sub">last 30 days · restorable</span>
+      <button class="icon-btn" id="deleted-close" title="Close" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="dd-list" id="deleted-list"></div>
+    <div class="dd-empty" id="deleted-empty" hidden>Nothing deleted in the last 30 days.</div>
+  </aside>
+
+  <!-- Latency drawer (topbar ⏱): day × hour speed heatmap, recomputed live
+       on every open (no baked-in cache — a fresh query each click). Same
+       shape as the standalone qwen_latency_day_hour.html, but the data is
+       fetched from /api/latency so it's always current. -->
+  <div class="dd-dim lat-dim" id="lat-dim" hidden></div>
+  <aside class="deleted-drawer lat-drawer" id="lat-drawer" hidden>
+    <div class="dd-head">
+      <span class="dd-title">Model speed</span>
+      <span class="dd-sub" id="lat-sub"></span>
+      <button class="icon-btn" id="lat-close" title="Close" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="lat-body" id="lat-body">
+      <div class="lat-toggle" id="lat-toggle">
+        <button id="lat-btn-tok" class="active">tok/s (fast = green)</button>
+        <button id="lat-btn-ms">round time (slow = red)</button>
+      </div>
+      <div class="lat-scroll">
+        <div class="lat-grid" id="lat-grid"></div>
+      </div>
+      <div class="lat-legend" id="lat-legend"></div>
+      <div class="lat-verdict" id="lat-verdict"></div>
+      <div class="lat-note" id="lat-note"></div>
+    </div>
+  </aside>
+
+  <!-- Mobile: tap-outside dim layer. JS shows it when a panel is open on a
+       narrow screen; tapping it closes the panel. Never shown on desktop. -->
+  <div class="panel-overlay" id="panel-overlay" hidden></div>
+</div>
+<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
+<script src="/static/vendor/highlight.min.js"></script>
+<script src="/static/vendor/katex.min.js"></script>
+<script src="/static/app.js?v=161"></script>
+</body>
+</html>
