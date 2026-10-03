@@ -26,6 +26,10 @@ if not exist ".env" (
   )
 )
 
+rem First run: drop a permanent desktop shortcut (idempotent - only if missing).
+rem Uses the shell Desktop folder so OneDrive-redirected desktops still work.
+powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $p=Join-Path $d 'general-muji.lnk'; if(-not (Test-Path $p)){ $s=(New-Object -ComObject WScript.Shell).CreateShortcut($p); $s.TargetPath='%~dp0start.bat'; $s.WorkingDirectory='%~dp0'; $s.Description='muji - local agent'; $s.Save(); Write-Host 'Created desktop shortcut: general-muji.lnk' }"
+
 if not exist ".venv\Scripts\python.exe" (
   echo [1/3] First run: creating local virtual environment...
   python -m venv .venv
