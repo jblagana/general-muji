@@ -6226,6 +6226,188 @@
     updatePanelOverlay();  // sidebar is open → the dimmed tap-outside layer shows
   }
 
+  // ── First-run setup overlay ─────────────────────────────────────
+  // Shown when /api/setup/status says the model endpoint isn't configured.
+  // Collects base URL / API key / model, writes them to .env via
+  // POST /api/setup/save, then reloads the page. The server picks up
+  // the new env vars on restart.
+  function initSetup() {
+    const setup = $("setup");
+    if (!setup) return;
+    setup.hidden = false;
+    const base = $("setup-base");
+    const key = $("setup-key");
+    const model = $("setup-model");
+    const modelCustom = $("setup-model-custom");
+    const detect = $("setup-detect");
+    const modelHint = $("setup-model-hint");
+    const go = $("setup-go");
+    const status = $("setup-status");
+    const presets = $("setup-presets");
+
+    // Auto-detect models from the endpoint (proxied by /api/models).
+    // Debounced: fires 600 ms after the last Base-URL keystroke, or
+    // immediately on preset click. Local endpoints (Ollama etc.) work
+    // without a key; hosted ones need one (a 401 just returns []).
+    let detectTimer;
+    function autoDetect() {
+      const url = base.value.trim().replace(/\/+$/, "");
+      if (!url) {
+        setModelList([], "");
+        detect.className = "setup-detect";
+        detect.textContent = "";
+        modelHint.textContent = "Paste a Base URL to auto-detect models.";
+        return;
+      }
+      detect.className = "setup-detect loading";
+      detect.textContent = "detecting…";
+      const params = new URLSearchParams({ base: url });
+      const k = key.value.trim();
+      if (k) params.set("key", k);
+      fetch("/api/models?" + params.toString(), { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          const list = d.models || [];
+          setModelList(list, list[0] || "");
+          if (list.length) {
+            detect.className = "setup-detect show";
+            detect.textContent = "auto-detected";
+            modelHint.textContent =
+              list.length + " model" + (list.length > 1 ? "s" : "") +
+              " found at this endpoint.";
+          } else {
+            detect.className = "setup-detect";
+            detect.textContent = "";
+            modelHint.textContent = d.error
+              ? "Couldn't detect models (" + d.error + ") — type a name below."
+              : "No models found — type a model name below.";
+            modelCustom.style.display = "block";
+          }
+        })
+        .catch(() => {
+          detect.className = "setup-detect";
+          detect.textContent = "";
+          modelHint.textContent = "Couldn't reach the endpoint — type a model name below.";
+          modelCustom.style.display = "block";
+        });
+    }
+
+    function setModelList(list, selected) {
+      model.innerHTML = '<option value="">— pick a model —</option>';
+      list.forEach((m) => {
+        const o = document.createElement("option");
+        o.value = m;
+        o.textContent = m;
+        if (m === selected) o.selected = true;
+        model.appendChild(o);
+      });
+      const custom = document.createElement("option");
+      custom.value = "__custom__";
+      custom.textContent = "…or type a model name";
+      model.appendChild(custom);
+      modelCustom.style.display = "none";
+    }
+
+    // Preset click: fill Base URL, trigger detect.
+    // Custom: clear Base URL, focus it, drop to type-your-own model.
+    presets.addEventListener("click", (e) => {
+      const p = e.target.closest(".setup-preset");
+      if (!p) return;
+      presets.querySelectorAll(".setup-preset").forEach((x) => x.classList.remove("active"));
+      p.classList.add("active");
+      base.value = p.dataset.base;
+      if (p.dataset.base === "") {
+        setModelList([], "");
+        modelCustom.style.display = "block";
+        detect.className = "setup-detect";
+        detect.textContent = "";
+        modelHint.textContent = "Paste your Base URL above and type a model name below.";
+        base.focus();
+      } else {
+        clearTimeout(detectTimer);
+        detectTimer = setTimeout(autoDetect, 100);
+      }
+    });
+
+    // Base URL change → re-detect (debounced).
+    base.addEventListener("input", () => {
+      presets.querySelectorAll(".setup-preset").forEach((x) => x.classList.remove("active"));
+      clearTimeout(detectTimer);
+      detectTimer = setTimeout(autoDetect, 600);
+    });
+
+    // Key change → re-detect if a model list is already showing
+    // (hosted endpoints need the key to list models).
+    key.addEventListener("input", () => {
+      if (model.options.length > 2) { // has detected models
+        clearTimeout(detectTimer);
+        detectTimer = setTimeout(autoDetect, 600);
+      }
+    });
+
+    // Model select: "…or type a model name" shows the custom input.
+    model.addEventListener("change", () => {
+      if (model.value === "__custom__") {
+        modelCustom.style.display = "block";
+        modelCustom.focus();
+      } else {
+        modelCustom.style.display = "none";
+      }
+    });
+    modelCustom.addEventListener("input", () => {
+      presets.querySelectorAll(".setup-preset").forEach((x) => x.classList.remove("active"));
+    });
+
+    function getModel() {
+      if (model.value === "__custom__") return modelCustom.value.trim();
+      return model.value;
+    }
+
+    // Save & Connect: validate, POST to /api/setup/save, reload.
+    go.addEventListener("click", () => {
+      const b = base.value.trim().replace(/\/+$/, "");
+      const k = key.value.trim();
+      const m = getModel();
+      if (!b) { showStatus("err", "✕ Enter a Base URL."); return; }
+      if (!m) { showStatus("err", "✕ Pick or type a model name."); return; }
+      // Local endpoints don't need a real key; hosted ones do.
+      const looksLocal = /localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.|10\./.test(b);
+      if (!k && !looksLocal) { showStatus("err", "✕ Enter an API key to continue."); return; }
+
+      go.disabled = true;
+      showStatus("loading", "Saving…");
+      fetch("/api/setup/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base_url: b, api_key: k, model: m }),
+      })
+        .then((r) => {
+          if (!r.ok) return r.json().then((d) => { throw new Error(d.detail || r.status); });
+          return r.json();
+        })
+        .then(() => {
+          showStatus("ok", "✓ Saved — reloading…");
+          setTimeout(() => location.reload(), 800);
+        })
+        .catch((e) => {
+          showStatus("err", "✕ " + e.message);
+          go.disabled = false;
+        });
+    });
+
+    function showStatus(kind, msg) {
+      status.className = "setup-status show" + (kind === "loading" ? "" : " " + kind);
+      if (kind === "loading") {
+        status.innerHTML = '<span class="spin"></span> ' + msg;
+      } else {
+        status.textContent = msg;
+      }
+    }
+
+    // Initial: OpenAI preset is active in the HTML; fire detect on load.
+    autoDetect();
+  }
+
   async function boot() {
     initTheme();
     let config;
@@ -6238,6 +6420,18 @@
       return;
     }
     state.config = config;
+    // First-run: if no model endpoint is configured yet, show the setup
+    // overlay and stop here — the rest of boot (sessions, workspaces, etc.)
+    // is pointless until a model is connected.
+    let setupOk = true;
+    try {
+      const st = await (await fetch("/api/setup/status", { cache: "no-store" })).json();
+      setupOk = st.configured;
+    } catch (e) { /* endpoint missing (old server) — assume configured */ }
+    if (!setupOk) {
+      initSetup();
+      return;
+    }
     // The server process we're attached to — the revival detector's baseline
     // (see openStream's onerror). Fetched best-effort: if it fails, the
     // detector simply stays armed-off and the surgical paths cover the tab.

@@ -356,6 +356,97 @@ async def api_config():
     }
 
 
+# ── First-run setup ────────────────────────────────────────────────────
+# Shown when the three model-credential env vars are all unset/empty.
+# The overlay collects them, writes them to .env, then the user reloads.
+
+def _setup_configured() -> bool:
+    """True when the user has already connected a model endpoint."""
+    return bool(settings.base_url) and bool(settings.api_key) and settings.api_key != "sk-no-key" and bool(settings.model)
+
+
+@app.get("/api/setup/status")
+async def api_setup_status():
+    return {"configured": _setup_configured()}
+
+
+@app.get("/api/models")
+async def api_models(base: str = Query(...), key: str = Query("")):
+    """Proxy GET {base}/models so the UI can auto-populate the model dropdown.
+
+    Local endpoints (Ollama, vLLM, llama.cpp) accept any key (or none), so
+    the UI can call this before the user has typed a real key for those.
+    Hosted providers (OpenAI, OpenRouter) need a valid key — a 401 from
+    upstream is surfaced as an empty list + a hint, not an error."""
+    import httpx as _httpx
+    url = base.rstrip("/") + "/models"
+    headers = {}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    try:
+        async with _httpx.AsyncClient(timeout=8.0) as client:
+            r = await client.get(url, headers=headers)
+            if r.status_code != 200:
+                return {"models": [], "error": f"upstream {r.status_code}"}
+            data = r.json()
+            # OpenAI-compatible shape: {"data": [{"id": "..."}, ...]}
+            items = data.get("data", data if isinstance(data, list) else [])
+            models = []
+            for it in items:
+                if isinstance(it, str):
+                    models.append(it)
+                elif isinstance(it, dict) and "id" in it:
+                    models.append(it["id"])
+            models.sort()
+            return {"models": models}
+    except Exception as e:
+        return {"models": [], "error": str(e)}
+
+
+def _upsert_env_line(path: Path, key: str, value: str) -> None:
+    """Set or append a single KEY=VALUE line in a .env file, preserving
+    all other lines and comments. Creates the file with a header if absent."""
+    if path.exists():
+        lines = path.read_text(encoding="utf-8").splitlines()
+        out, found = [], False
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                k = stripped.split("=", 1)[0].strip()
+                if k == key:
+                    out.append(f"{key}={value}")
+                    found = True
+                    continue
+            out.append(line)
+        if not found:
+            out.append(f"{key}={value}")
+        path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    else:
+        path.write_text(
+            "# muji — model endpoint\n"
+            f"{key}={value}\n",
+            encoding="utf-8",
+        )
+
+
+@app.post("/api/setup/save")
+async def api_setup_save(payload: dict):
+    """Persist the three model-credential values to .env. The user must
+    then reload the page (or hit the sidebar ⟳) for the server to pick
+    them up — the running process reads env vars at import time."""
+    base_url = (payload.get("base_url") or "").strip()
+    api_key = (payload.get("api_key") or "").strip()
+    model = (payload.get("model") or "").strip()
+    if not base_url or not model:
+        raise HTTPException(400, "base_url and model are required")
+    env_path = APP_ROOT / ".env"
+    _upsert_env_line(env_path, "OPENAI_BASE_URL", base_url)
+    _upsert_env_line(env_path, "OPENAI_API_KEY", api_key or "sk-no-key")
+    _upsert_env_line(env_path, "MODEL", model)
+    log("info", f"setup: saved base_url={base_url} model={model}")
+    return {"ok": True, "needs_reload": True}
+
+
 @app.get("/api/latency")
 async def api_latency():
     """Day × hour latency heatmap data, recomputed on demand from the

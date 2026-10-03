@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)" id="hljs-light"/>
   <link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark"/>
   <link rel="stylesheet" href="/static/vendor/katex.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=133"/>
+  <link rel="stylesheet" href="/static/style.css?v=134"/>
 </head>
 <body>
 <!-- Splash: shown on first paint (PWA cold-start), hidden by app.js once
@@ -22,6 +22,48 @@
      in <head>), so no FOUC of an unstyled splash. -->
 <div id="splash" aria-hidden="true">
   <div class="splash-word">muji<span class="splash-dot">.</span></div>
+</div>
+<!-- First-run setup: shown when no model endpoint is configured yet.
+     app.js checks /api/setup/status on boot and hides this (or the app)
+     accordingly. The card collects base URL / key / model, writes them
+     to .env, then reloads. -->
+<div id="setup" hidden>
+  <div class="setup-card">
+    <div class="setup-word">muji<span class="splash-dot">.</span></div>
+    <p class="setup-sub">First run — connect a model to get started.</p>
+    <div class="setup-presets" id="setup-presets">
+      <button class="setup-preset active" data-base="https://api.openai.com/v1">OpenAI</button>
+      <button class="setup-preset" data-base="https://openrouter.ai/api/v1">OpenRouter</button>
+      <button class="setup-preset" data-base="http://localhost:11434/v1">Ollama</button>
+      <button class="setup-preset" data-base="">Custom</button>
+    </div>
+    <div class="setup-field">
+      <label for="setup-base">Base URL</label>
+      <input id="setup-base" type="text" value="https://api.openai.com/v1" spellcheck="false"/>
+    </div>
+    <div class="setup-field">
+      <label for="setup-key">API Key</label>
+      <input id="setup-key" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false"/>
+      <div class="setup-hint">Stored locally — never uploaded.</div>
+    </div>
+    <div class="setup-field">
+      <label for="setup-model">Model <span class="setup-detect" id="setup-detect"></span></label>
+      <div class="setup-model-wrap">
+        <select id="setup-model" spellcheck="false">
+          <option value="">— pick a model —</option>
+        </select>
+        <span class="setup-model-caret">▾</span>
+      </div>
+      <input id="setup-model-custom" type="text" placeholder="…or type a model name" spellcheck="false" autocomplete="off" style="display:none;margin-top:.5rem"/>
+      <div class="setup-hint" id="setup-model-hint">Auto-detected from the endpoint — or type your own below.</div>
+    </div>
+    <button class="btn primary" id="setup-go">Save &amp; Connect</button>
+    <div class="setup-status" id="setup-status"></div>
+    <div class="setup-fineprint">
+      <b>That's it.</b> Personal integrations (Gmail, Telegram, to-dos, calendar)
+      are off by default — enable them in <b>Settings</b> when you need them.
+    </div>
+  </div>
 </div>
 <!-- Global fallback banner: a background chat is waiting (question/approval)
      — mark + title + countdown pill + View -->
@@ -392,6 +434,6 @@
 <script src="/static/vendor/purify.min.js"></script>
 <script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/katex.min.js"></script>
-<script src="/static/app.js?v=161"></script>
+<script src="/static/app.js?v=162"></script>
 </body>
 </html>
