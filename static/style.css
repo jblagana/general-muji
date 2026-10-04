@@ -511,15 +511,33 @@ body.resizing-h iframe { pointer-events: none; }
 }
 .brand { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: 15px; }
 .brand-mark { display: block; width: 20px; height: 20px; }
+/* Icon sprite (2026-10-05): stroke follows currentColor — every .mi tints
+   with the surrounding text color (ink / sage / mint per theme). Sized by
+   context (buttons inherit font-size; rows get explicit px below). */
+.mi {
+  width: 1em; height: 1em; flex: none; display: inline-block; vertical-align: -0.12em;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
 .icon-btn {
   background: none; border: none; color: var(--muted); cursor: pointer;
   font-size: 14px; padding: 4px 7px; border-radius: 6px; line-height: 1;
   text-decoration: none; display: inline-flex; align-items: center;
 }
 .icon-btn:hover { background: var(--panel-2); color: var(--text); }
-/* brain + tool: the 🧠 button carries a small 🛠 badge (left side) marking
-   the tool_notes.md source; click opens the combined review panel */
-.tool-ic { font-size: 10px; margin-right: 2px; opacity: .85; }
+/* sprite sizing per context — .mi defaults to 1em (inherits font-size);
+   these pin the icon to a fixed px where the surrounding text size varies */
+.session-item .s-title .mi, .rp-session-title .mi { width: 11px; height: 11px; opacity: .85; }
+.think-hint .mi, .think-head .mi { width: 12px; height: 12px; }
+.file-chip .fc-name .mi { width: 12px; height: 12px; }
+.tree-row .tr-name .mi { width: 13px; height: 13px; }
+.qc-head .mark .mi, .approval-banner .ab-head .mark .mi { width: 14px; height: 14px; }
+.approval-title .mi { width: 14px; height: 14px; }
+.sup-title .mi { width: 11px; height: 11px; }
+.msg-files > summary .mi { width: 12px; height: 12px; }
+.offline-banner .mi { width: 14px; height: 14px; }
+.tz-t-row .r-edit .mi, .tz-e-row .r-del .mi { width: 11px; height: 11px; }
+.mini-btn .mi { width: 11px; height: 11px; }
 /* brain: dot = pending learned patterns (banner hidden via "Later") */
 .icon-btn.has-pending { position: relative; }
 .icon-btn.has-pending::after {
@@ -558,7 +576,8 @@ body.resizing-h iframe { pointer-events: none; }
 .ws-item.active, .session-item.active {
   background: var(--accent-soft); border-left-color: var(--accent);
 }
-.ws-item .ws-ic { font-size: 12px; flex: none; }
+.ws-item .ws-ic { flex: none; display: inline-flex; }
+.ws-item .ws-ic .mi { width: 12px; height: 12px; }
 .ws-item .ws-name, .session-item .s-title {
   flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -1408,7 +1427,8 @@ body.resizing-h iframe { pointer-events: none; }
 .phase .tl-tag.plan { background: var(--accent-soft); color: var(--accent); }
 .phase .tl-tag.verify { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
 .phase .tl-tag.done { background: var(--panel-2); color: var(--muted); opacity: .7; }
-.phase .tl-ico { font-size: 12px; flex: none; }
+.phase .tl-ico { flex: none; display: inline-flex; }
+.phase .tl-ico .mi { width: 12px; height: 12px; }
 .phase .tl-st { font-size: 11px; flex: none; margin-left: auto; }
 .phase .tl-st.ok { color: var(--ok); }
 .phase .tl-st.err { color: var(--err); }
@@ -1808,6 +1828,9 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
 #mode-toggle .mode-btn[data-mode="act"].active { background: var(--act-toggle); }
 /* dark-mode pills are bright (gold/emerald) → dark text for contrast */
 [data-theme="dark"] #mode-toggle .mode-btn.active { color: #0b0e13; }
+/* roast pills: the sprite icon inherits the pill color (muted → white on
+   active), so the moon/smile/flame read in the same tint as the text */
+#roast-toggle .mode-btn { display: inline-flex; align-items: center; justify-content: center; }
 
 /* ── right panel: two stacked panes — upper: Files/Preview,
       lower: Thinking/Terminal/Editor (Cline-style auto tabs) ── */

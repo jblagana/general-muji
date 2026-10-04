@@ -219,6 +219,20 @@
 
   function inlineUrl(url) { return url + (url.includes("?") ? "&" : "?") + "inline=1"; }
 
+  // Icon sprite (index.html, 2026-10-05): one stroke family for the whole UI.
+  // `icon(name)` clones the <symbol> into a live <svg> — stroke follows
+  // currentColor, so every icon tints per theme (ink / sage / mint) with no
+  // second asset. Replaces the ~20 color emoji that fought the forest palette.
+  function icon(name) {
+    const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.classList.add("mi");
+    s.setAttribute("aria-hidden", "true");
+    const u = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    u.setAttribute("href", "#i-" + name);
+    s.appendChild(u);
+    return s;
+  }
+
   // ── Markdown rendering ────────────────────────────────────────
   // Math (LaTeX) rendering: $…$ / $$…$$ are pulled out of the markdown
   // BEFORE marked sees it (see extractMathBlocks) and restored as KaTeX
@@ -569,7 +583,8 @@
         } else {
           const c = document.createElement("span");
           c.className = "attach-chip";
-          c.textContent = "📎 " + (f.original || f.name);
+          c.appendChild(icon("paperclip"));
+          c.appendChild(document.createTextNode(" " + (f.original || f.name)));
           c.title = f.url || f.path || "";
           c.addEventListener("click", () => openPreview(f));
           arow.appendChild(c);
@@ -666,7 +681,7 @@
     turn.hint = document.createElement("a");
     turn.hint.className = "think-hint";
     turn.hint.hidden = true;
-    turn.hint.textContent = "💭 thinking…";
+    turn.hint.innerHTML = '<span class="mi mi-brain"></span> thinking…';
     turn.hint.addEventListener("click", () => {
       setRightPanelOpen(true);
       setUpperTab("thinking");
@@ -978,7 +993,7 @@
     if (!turn.lastEventWasThinking) {
       turn.hintStart = Date.now();
       turn.hint.hidden = false;
-      turn.hint.textContent = "💭 thinking…";
+      turn.hint.innerHTML = '<span class="mi mi-brain"></span> thinking…';
       turn.row.hidden = false;
       syncLane(turn);  // the hint grew the group — the lane must move NOW,
                        // not on the ResizeObserver's async tick
@@ -989,7 +1004,7 @@
   function finalizeThinkingHint(turn) {
     if (turn.lastEventWasThinking && turn.hintStart) {
       const secs = Math.max(1, Math.round((Date.now() - turn.hintStart) / 1000));
-      turn.hint.textContent = "💭 thought " + secs + "s → Thinking tab";
+      turn.hint.innerHTML = '<span class="mi mi-brain"></span> thought ' + secs + 's → Thinking tab';
       turn.hintStart = 0;
     }
     turn.lastEventWasThinking = false;
@@ -1002,7 +1017,7 @@
     const lab = turn.chip.querySelector(".think-label");
     if (lab) lab.textContent = "Done";
     turn.hint.hidden = false;
-    turn.hint.textContent = "💭 thought → Thinking tab";
+    turn.hint.innerHTML = '<span class="mi mi-brain"></span> thought → Thinking tab';
     turn.row.hidden = false;
     // In loadHistory the root isn't in the DOM yet (the col would measure
     // 0) — watchGroup's syncLane after appendChild sets the real --lane
@@ -1246,7 +1261,7 @@
   // missing/unparseable.
   // phase tag for the mockup-style pill: plan (reading/exploring) /
   // verify (test & check commands) / tool (everything else). The pill is
-  // the first thing in the row — the row reads [plan] 📖 Reading app.js ✓
+  // the first thing in the row — the row reads [plan] (file-text icon) Reading app.js ✓
   function phaseOf(name, argsStr) {
     const plan = ["read_file", "list_dir", "search_files", "local_search",
                   "index_documents", "web_search", "fetch_url", "browser"];
@@ -1261,13 +1276,15 @@
     }
     return "tool";
   }
+  // sprite names (index.html <symbol id="i-…">) — stroke tints per theme
   function phaseIcon(name, ph) {
     const byTool = {
-      read_file: "📖", list_dir: "📂", search_files: "🔍", local_search: "🔍",
-      index_documents: "🗂", web_search: "🌐", fetch_url: "🌐", browser: "🌐",
-      write_file: "✏️", edit_file: "✏️", run_command: "⚙️", ask_user: "❓",
+      read_file: "file-text", list_dir: "folder", search_files: "search",
+      local_search: "search", index_documents: "layers", web_search: "globe",
+      fetch_url: "globe", browser: "globe", write_file: "pen", edit_file: "pen",
+      run_command: "terminal", ask_user: "help-circle",
     };
-    return byTool[name] || (ph === "plan" ? "🔍" : "⚙️");
+    return byTool[name] || (ph === "plan" ? "search" : "terminal");
   }
   function makePhase(name, argsStr, done, d, rawArgs) {
     const det = document.createElement("details");
@@ -1281,7 +1298,7 @@
     tag.textContent = ph;
     const ico = document.createElement("span");
     ico.className = "tl-ico";
-    ico.textContent = phaseIcon(name, ph);
+    ico.appendChild(icon(phaseIcon(name, ph)));
     const label = document.createElement("span");
     label.className = "phase-title";
     const phrase = toolPhrase(name, rawArgs || argsStr || "");
@@ -1573,9 +1590,9 @@
     card.className = "approval-card";
     const title = document.createElement("div");
     title.className = "approval-title";
-    title.textContent = d.title
-      ? "⚠ Approval needed — " + d.title
-      : "⚠ Approval needed — this command is not read-only";
+    title.innerHTML = '<span class="mi mi-triangle-alert"></span> Approval needed — ' +
+      String(d.title || "this command is not read-only")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const pre = document.createElement("pre");
     pre.textContent = approvalCommand(d);
     const reason = document.createElement("div");
@@ -1638,7 +1655,7 @@
     head.className = "qc-head";
     const mark = document.createElement("span");
     mark.className = "mark";
-    mark.textContent = "❓";
+    mark.appendChild(icon("help-circle"));
     const title = document.createElement("span");
     title.className = "question-title";
     title.textContent = p.question || "A quick question";
@@ -1689,7 +1706,7 @@
     head.className = "qc-head";
     const mark = document.createElement("span");
     mark.className = "mark";
-    mark.textContent = "❓";
+    mark.appendChild(icon("help-circle"));
     const title = document.createElement("span");
     title.className = "question-title";
     title.textContent = d.question || "A quick question";
@@ -1780,15 +1797,16 @@
   function addFileChips(turn, files) {
     if (!files || !files.length) return;
     turn.filesRow.hidden = false;
-    turn.filesSum.textContent =
-      "📁 " + files.length + " file" + (files.length > 1 ? "s" : "") + " changed";
+    turn.filesSum.innerHTML = '<span class="mi mi-folder"></span> ' +
+      files.length + " file" + (files.length > 1 ? "s" : "") + " changed";
     (files).forEach((f) => {
       const chip = document.createElement("div");
       chip.className = "file-chip";
-      const ico = { markdown: "📝", html: "🌐", image: "🖼", code: "⌨", text: "📄" }[f.kind] || "📄";
+      const ico = FILE_ICONS[f.kind] || "file";
       const name = document.createElement("span");
       name.className = "fc-name";
-      name.textContent = ico + " " + (f.name || "file");
+      name.appendChild(icon(ico));
+      name.appendChild(document.createTextNode(" " + (f.name || "file")));
       name.title = f.path || f.name;
       chip.appendChild(name);
       if (f.size != null) {
@@ -2251,7 +2269,7 @@
     }
     const isQ = !!waiting.waiting_question;
     el.approvalBanner.classList.toggle("a", !isQ);
-    el.bannerMark.textContent = isQ ? "❓" : "⚠";
+    el.bannerMark.replaceChildren(icon(isQ ? "help-circle" : "triangle-alert"));
     el.bannerText.textContent = (waiting.title || "A chat") +
       (isQ ? " is waiting for your answer"
            : " is waiting for your approval");
@@ -2476,7 +2494,8 @@
     titleRow.className = "s-title-row";
     const title = document.createElement("span");
     title.className = "s-title";
-    title.textContent = (s.pinned ? "📌 " : "") + (s.title || "New chat");
+    if (s.pinned) title.appendChild(icon("pin"));
+    title.appendChild(document.createTextNode((s.pinned ? " " : "") + (s.title || "New chat")));
     titleRow.appendChild(title);
     if (s.tldr_flags > 0) {
       const flag = document.createElement("span");
@@ -2528,7 +2547,8 @@
       if (danger) b.classList.add("danger");
       return b;
     };
-    const pinBtn = mkItem(s.pinned ? "📌 Unpin" : "📌 Pin to top");
+    const pinBtn = mkItem(s.pinned ? "Unpin" : "Pin to top");
+    pinBtn.prepend(icon("pin"), document.createTextNode(" "));
     const renBtn = mkItem("✎ Rename…");
     const delBtn = mkItem("✕ Delete", true);
     pinBtn.addEventListener("click", (ev) => {
@@ -2731,7 +2751,7 @@
       item.className = "ws-item" + (state.wsSel === w.id ? " active" : "");
       const ic = document.createElement("span");
       ic.className = "ws-ic";
-      ic.textContent = "📁";
+      ic.appendChild(icon("folder"));
       item.appendChild(ic);
       const nm = document.createElement("span");
       nm.className = "ws-name";
@@ -3007,11 +3027,11 @@
       if (ui.thinking) {
         // mid-thinking at snapshot time — live thinking frames continue the
         // same hint (the next non-thinking frame finalizes it as usual)
-        turn.hint.textContent = "💭 thinking…";
+        turn.hint.innerHTML = '<span class="mi mi-brain"></span> thinking…';
         turn.lastEventWasThinking = true;
         turn.hintStart = Date.now();
       } else {
-        turn.hint.textContent = "💭 thought → Thinking tab";
+        turn.hint.innerHTML = '<span class="mi mi-brain"></span> thought → Thinking tab';
       }
       const p = panel(sid);
       p.think.push({ text: draft.thinking, live: true, start: Date.now() });
@@ -4359,7 +4379,8 @@
         nm.textContent = a.original || a.name;
         chip.appendChild(nm);
       } else {
-        chip.textContent = "📎 " + (a.original || a.name);
+        chip.appendChild(icon("paperclip"));
+        chip.appendChild(document.createTextNode(" " + (a.original || a.name)));
       }
       const rm = document.createElement("button");
       rm.textContent = " ✕";
@@ -4683,7 +4704,8 @@
     chev.textContent = t.live ? "▼" : "▶";
     sum.appendChild(chev);
     const lab = document.createElement("span");
-    lab.textContent = "💭 " + (t.live ? "Thinking…" : "Thought");
+    lab.appendChild(icon("brain"));
+    lab.appendChild(document.createTextNode(" " + (t.live ? "Thinking…" : "Thought")));
     sum.appendChild(lab);
     const body = document.createElement("div");
     body.className = "think-body";
@@ -4945,7 +4967,9 @@
   }
 
   // ── Composer ──────────────────────────────────────────────────
-  const FILE_ICONS = { markdown: "📝", html: "🌐", ipynb: "📓", image: "🖼", code: "⌨", text: "📄" };
+  // sprite names (index.html <symbol id="i-…">) — stroke tints per theme
+  const FILE_ICONS = { markdown: "file-pen", html: "globe", ipynb: "file-text",
+                       image: "image", code: "terminal", text: "file" };
 
   const KIND_EXT = {
     md: "markdown", markdown: "markdown", html: "html", htm: "html", ipynb: "ipynb",
@@ -4970,7 +4994,9 @@
     const s = state.sessionId
       ? state.sessions.find((x) => x.id === state.sessionId) : null;
     const name = (s && s.title) || "New chat";
-    el.rpSessionTitle.textContent = (s && s.pinned ? "📌 " : "") + name;
+    el.rpSessionTitle.replaceChildren(
+      s && s.pinned ? icon("pin") : null,
+      document.createTextNode((s && s.pinned ? " " : "") + name));
     el.rpSessionTitle.title = name;
   }
 
@@ -5088,7 +5114,8 @@
       row.className = "tree-row";
       const nm = document.createElement("span");
       nm.className = "tr-name";
-      nm.textContent = (e.is_dir ? "📁 " : (FILE_ICONS[e.kind] || "📄") + " ") + e.name;
+      nm.appendChild(icon(e.is_dir ? "folder" : (FILE_ICONS[e.kind] || "file")));
+      nm.appendChild(document.createTextNode(" " + e.name));
       nm.title = e.path;
       row.appendChild(nm);
       if (!e.is_dir && e.size != null) {
@@ -5105,15 +5132,16 @@
       const mkBtn = (txt, title, fn) => {
         const b = document.createElement("button");
         b.className = "mini-btn";
-        b.textContent = txt;
+        if (typeof txt === "string") b.textContent = txt;
+        else b.appendChild(txt);
         b.title = title;
         b.addEventListener("click", fn);
         acts.appendChild(b);
       };
       mkBtn("⧉", "Copy path", () => copyText(e.path, null));
-      mkBtn("↗️", "Reveal in File Explorer", () => revealInExplorer(e.path));
-      mkBtn("✏", "Rename (or drag this row onto itself)", () => askRename(e));
-      mkBtn("🗑", "Delete", () => askDelete(e));
+      mkBtn("↗", "Reveal in File Explorer", () => revealInExplorer(e.path));
+      mkBtn(icon("pen"), "Rename (or drag this row onto itself)", () => askRename(e));
+      mkBtn(icon("trash"), "Delete", () => askDelete(e));
       if (!e.is_dir) {
         const dl = document.createElement("a");
         dl.className = "mini-btn";
@@ -5848,7 +5876,7 @@
     if (kind === "task") {
       const ed = document.createElement("button");
       ed.className = "r-edit";
-      ed.textContent = "✏";
+      ed.appendChild(icon("pen"));
       ed.title = "Edit task";
       ed.addEventListener("click", (ev) => {
         ev.stopPropagation();
