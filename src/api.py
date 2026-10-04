@@ -342,8 +342,15 @@ async def security_headers(request: Request, call_next):
 
 @app.get("/api/health")
 async def health():
+    # "boot_token" identifies WHICH checkout answers: server.py writes a
+    # per-boot random token to server.boot and sets it here; the launcher
+    # compares it against probe responses, so "is the port ours?" is
+    # answered by a secret no other checkout (even another muji clone)
+    # can match. Empty when run outside server.py (tests) — probes then
+    # just report "not ours", which is the safe answer.
     return {"ok": True, "model": settings.model, "tool_mode": agent._llm.mode,
-            "boot_id": BOOT_ID}
+            "boot_id": BOOT_ID, "root": str(APP_ROOT),
+            "boot_token": os.environ.get("MUJI_BOOT_TOKEN", "")}
 
 
 @app.get("/api/config")

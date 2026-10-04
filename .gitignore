@@ -7,6 +7,7 @@ uploads/
 node_modules/
 *.log
 muji.db*
+server.port
 check_pending.py
 tools/_whoami_8321.ps1
 tools/_hljs_test.js

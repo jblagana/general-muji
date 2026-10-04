@@ -61,16 +61,9 @@ if errorlevel 1 (
 
 echo [3/3] Starting server...
 
-powershell -NoProfile -Command "try { $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', %PORT%); exit 1 } catch { exit 0 }" >nul 2>nul
-if errorlevel 1 (
-  echo Server is already running - opening the browser.
-  start "" "http://127.0.0.1:%PORT%"
-  timeout /t 3 >nul
-  exit /b 0
-)
-
-timeout /t 2 /nobreak >nul
-start "" "http://127.0.0.1:%PORT%"
-".venv\Scripts\python.exe" server.py
-echo.
-echo Server stopped.
+rem tools\launch.py owns the rest: it only treats the port as "already
+rem running" if OUR server answers /api/health (a foreign program on the
+rem port is not us), starts server.py as a child (closing this window
+rem stops it), and opens the browser on the port server.py actually
+rem bound (recorded in server.port if it had to move off the configured one).
+".venv\Scripts\python.exe" tools\launch.py
