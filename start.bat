@@ -32,8 +32,9 @@ for /f "usebackq delims=" %%p in (`powershell -NoProfile -Command "$m=Select-Str
 
 rem First run: drop a permanent desktop shortcut (idempotent - only if missing
 rem or pointing at the wrong start.bat, so a stale one self-heals on next launch).
+rem Named "muji2.0" so it never collides with the original repo's "muji".
 rem Uses the shell Desktop folder so OneDrive-redirected desktops still work.
-powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $p=Join-Path $d 'muji.lnk'; $t='%~dp0start.bat'; $s=(New-Object -ComObject WScript.Shell).CreateShortcut($p); if(-not (Test-Path $p) -or $s.TargetPath -ne $t){ $s.TargetPath=$t; $s.WorkingDirectory='%~dp0'; $s.Description='muji - local agent'; $s.IconLocation='%~dp0static\favicon.ico'; $s.Save(); Write-Host 'Created desktop shortcut: muji.lnk' }"
+powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $p=Join-Path $d 'muji2.0.lnk'; $t='%~dp0start.bat'; $s=(New-Object -ComObject WScript.Shell).CreateShortcut($p); if(-not (Test-Path $p) -or $s.TargetPath -ne $t){ $s.TargetPath=$t; $s.WorkingDirectory='%~dp0'; $s.Description='muji2.0 - local agent'; $s.IconLocation='%~dp0static\favicon.ico'; $s.Save(); Write-Host 'Created desktop shortcut: muji2.0.lnk' }"
 
 if not exist ".venv\Scripts\python.exe" (
   echo [1/3] First run: creating local virtual environment...
