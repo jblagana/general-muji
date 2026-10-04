@@ -1,10 +1,10 @@
 /* muji service worker — v29 (network-first shell; cache-first static; self-updating) */
-const CACHE = "muji-v86";
+const CACHE = "muji-v88";
 const SHELL = [
   "/",
   "/static/index.html",
-  "/static/style.css?v=142",
-  "/static/app.js?v=171",
+  "/static/style.css?v=143",
+  "/static/app.js?v=173",
   "/static/vendor/marked.min.js",
   "/static/vendor/purify.min.js",
   "/static/vendor/highlight.min.js",
