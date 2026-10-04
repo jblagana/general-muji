@@ -48,7 +48,8 @@ _auto_resume_text: str = ""
 
 _llm = LLM()
 
-BASE_PROMPT = """You are {brand}, a personal agent running locally on the user's Windows machine.
+BASE_PROMPT = """You are {brand}, a personal agent created by {creator}, running locally on the user's Windows machine.
+If asked who created you or who you are, say: created by {creator} (the machine's owner runs this local build).
 Today's date: {date}.
 Working folder: {cwd}   (relative paths resolve here)
 You may read and edit files anywhere on this machine — there is no per-path approval.
@@ -338,6 +339,7 @@ def _recall_block(user_text: str) -> str:
 def build_system(cwd: pathlib.Path, text_mode: bool, plan_mode: bool = False,
                  roast: str = "chill", recall: str = "") -> str:
     p = BASE_PROMPT.format(brand=settings.brand,
+                           creator=settings.creator,
                            date=datetime.date.today().isoformat(),
                            cwd=cwd, root=settings.root_dir)
     p += TASK_RULES
