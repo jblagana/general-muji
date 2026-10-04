@@ -98,7 +98,7 @@
     // lower pane; a stale lower-pane "thinking" selection is dropped.
     rightTab: ["thinking", "files", "preview"].includes(localStorage.getItem("muji.rightTab"))
       ? localStorage.getItem("muji.rightTab") : "files",
-    lowerTab: ["terminal", "steps", "editor"].includes(localStorage.getItem("muji.lowerTab"))
+    lowerTab: ["terminal", "editor"].includes(localStorage.getItem("muji.lowerTab"))
       ? localStorage.getItem("muji.lowerTab")
       : "terminal",
     sidebarW: parseInt(localStorage.getItem("muji.sidebarW") || "280", 10) || 280,
@@ -163,10 +163,8 @@
     rpTabsUpper: $("rp-tabs-upper"), rpTabsLower: $("rp-tabs-lower"),
     rpTabFiles: $("rp-tab-files"), rpTabPreview: $("rp-tab-preview"),
     rpTabThinking: $("rp-tab-thinking"), rpTabTerminal: $("rp-tab-terminal"),
-    rpTabSteps: $("rp-tab-steps"), rpTabEditor: $("rp-tab-editor"),
+    rpTabEditor: $("rp-tab-editor"),
     paneFiles: $("rp-pane-files"), paneTerminal: $("rp-pane-terminal"),
-    paneSteps: $("rp-pane-steps"), stepsList: $("steps-list"),
-    stepsCount: $("steps-count"),
     paneThinking: $("rp-pane-thinking"), panePreview: $("rp-pane-preview"),
     paneEditor: $("rp-pane-editor"),
     termInput: $("term-input"), termRun: $("term-run"),
@@ -4716,50 +4714,6 @@
     if (nearBottom) box.scrollTop = box.scrollHeight;
   }
 
-  // ── Steps pane (lower tab): every tool call of this chat, flat and
-  //    chronological, phase-tagged — the mockup's "B · Steps tab" surface.
-  //    Data = the same p.term rows the Terminal tab shows (tool_end events
-  //    + the lazy tool_log sync), so nothing new is fetched.
-  function renderStepsPane() {
-    const list = el.stepsList;
-    const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-    const items = (state.sessionId && state.panels[state.sessionId] || {}).term || [];
-    el.stepsCount.textContent = items.length
-      ? items.length + " call" + (items.length > 1 ? "s" : "") : "";
-    list.innerHTML = "";
-    if (!items.length) {
-      const empty = document.createElement("div");
-      empty.className = "term-empty";
-      empty.textContent = "No steps yet — every tool call lands here, " +
-        "chronological and phase-tagged.";
-      list.appendChild(empty);
-      return;
-    }
-    for (const t of items) {
-      const row = document.createElement("div");
-      row.className = "tl-step";
-      const ph = phaseOf(t.tool, t.args);
-      const tag = document.createElement("span");
-      tag.className = "tl-tag " + ph;
-      tag.textContent = ph;
-      const ico = document.createElement("span");
-      ico.className = "tl-ico";
-      ico.textContent = phaseIcon(t.tool, ph);
-      const name = document.createElement("span");
-      name.className = "tl-name";
-      name.textContent = t.tool || "tool";
-      const arg = document.createElement("span");
-      arg.className = "tl-arg";
-      arg.textContent = shortenArgs(t.args || "");
-      const st = document.createElement("span");
-      st.className = "tl-st " + (t.ok ? "ok" : "err");
-      st.textContent = t.ok ? "✓" : "✗";
-      row.append(tag, ico, name, arg, st);
-      list.appendChild(row);
-    }
-    if (nearBottom) list.scrollTop = list.scrollHeight;
-  }
-
   function panelToolEnd(sid, d) {
     if (!sid) return;
     const p = panel(sid);
@@ -4774,7 +4728,6 @@
     }
     if (sid === state.sessionId) {
       if (state.lowerTab === "terminal") renderTerminal();
-      if (state.lowerTab === "steps") renderStepsPane();
       // an edit just finished on the file the Editor shows → refresh it
       if (d.tool === "write_file" || d.tool === "edit_file") {
         const p = d.path || editorPathFromArgs(d.args);
@@ -4793,7 +4746,7 @@
     // tool_end events keep accumulating into p.term meanwhile, so a tab
     // opened mid-run still fills from the DB (this sync) without losing
     // anything.
-    if (!["terminal", "steps"].includes(state.lowerTab) || termLoaded.has(sid)) return;
+    if (state.lowerTab !== "terminal" || termLoaded.has(sid)) return;
     try {
       const res = await api("/api/sessions/" + encodeURIComponent(sid) + "/tool_log");
       if (!res.ok || sid !== state.sessionId) return;
@@ -4817,7 +4770,6 @@
       p.termIds = new Set(p.term.map((t) => t.id).filter(Boolean));
       termLoaded.add(sid);
       if (state.lowerTab === "terminal") renderTerminal();
-      if (state.lowerTab === "steps") renderStepsPane();
     } catch (e) { /* live events keep accumulating */ }
   }
 
@@ -5474,7 +5426,7 @@
   });
 
   const RP_UPPER_TABS = ["thinking", "files", "preview"];
-  const RP_LOWER_TABS = ["terminal", "steps", "editor"];
+  const RP_LOWER_TABS = ["terminal", "editor"];
 
   // ── Preview history: entering the Preview tab is a real browser-history
   // entry, so the (mouse) back/forward buttons walk
@@ -5539,10 +5491,8 @@
     el.rpTabsLower.querySelectorAll(".rp-tab").forEach((b) =>
       b.classList.toggle("active", b.dataset.rl === tab));
     el.paneTerminal.hidden = tab !== "terminal";
-    el.paneSteps.hidden = tab !== "steps";
     el.paneEditor.hidden = tab !== "editor";
     if (opts.auto && opts.btn) flashTab(opts.btn);
-    if (tab === "steps") renderStepsPane();
     // lazy tool_log: opening the Terminal tab is the moment the fetch is
     // worth paying (the sync is a no-op once termLoaded has the chat)
     if (tab === "terminal" && state.sessionId) syncTerminalFromDb(state.sessionId);
@@ -5557,7 +5507,6 @@
 
   function refreshPanel() {
     if (state.lowerTab === "terminal") renderTerminal();
-    if (state.lowerTab === "steps") renderStepsPane();
     if (state.rightTab === "files") {
       syncTreeToChat();
       syncHiddenToggle();
