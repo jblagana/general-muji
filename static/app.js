@@ -4344,20 +4344,22 @@
   }
 
   // ── Theme ─────────────────────────────────────────────────────
+  // 4 themes, cycled by the topbar toggle: light → forest → dark → forest-dark.
+  const THEMES = ["light", "forest", "dark", "forest-dark"];
+
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
-    $("hljs-light").media = theme === "dark" ? "not all" : "all";
-    $("hljs-dark").media = theme === "dark" ? "all" : "not all";
+    const dark = theme.includes("dark");
+    $("hljs-light").media = dark ? "not all" : "all";
+    $("hljs-dark").media = dark ? "all" : "not all";
     localStorage.setItem("muji.theme", theme);
   }
 
   function initTheme() {
-    // Forest themes were dropped — remap any old saved value to light/dark.
     const saved = localStorage.getItem("muji.theme");
-    const mapped = saved === "forest" ? "light" : saved === "forest-dark" ? "dark" : saved;
     const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark" : "light";
-    applyTheme(mapped || preferred);
+    applyTheme(THEMES.includes(saved) ? saved : preferred);
   }
 
   // ── Preview panel ─────────────────────────────────────────────
@@ -6912,7 +6914,8 @@
   el.addWorkspace.addEventListener("click", addWorkspace);
   el.themeToggle.addEventListener("click", () => {
     const cur = document.documentElement.getAttribute("data-theme") || "light";
-    applyTheme(cur === "light" ? "dark" : "light");
+    const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+    applyTheme(next);
   });
   el.modeToggle.querySelectorAll(".mode-btn").forEach((b) => {
     b.addEventListener("click", () => {
