@@ -1369,30 +1369,6 @@
         t = setTimeout(() => snapGroupToRow(body), 120);
       });
     }
-    // Long-run fold (mockup): when a run hits FOLD_AT consecutive tool
-    // calls, rows 3..N-2 collapse into ONE dashed strip parked BETWEEN the
-    // first 2 and last 2 rows — "5 more · 4× run_command · all ✓ · expand".
-    // Errors override: a failed hidden call turns the strip red and
-    // auto-expands. The strip lives INSIDE the scroll body (it takes the
-    // middle rows' slot); expand reveals them with a left rule. No
-    // re-render — rows move in/out of the fold body as the run grows.
-    const fold = document.createElement("div");
-    fold.className = "tl-fold";
-    fold.hidden = true;  // foldRows() un-hides it once the run crosses FOLD_AT
-    const fhead = document.createElement("div");
-    fhead.className = "tl-fold-head";
-    const fchev = document.createElement("span");
-    fchev.className = "f-chev";
-    fchev.textContent = "▸";
-    const flabel = document.createElement("span");
-    flabel.className = "f-label";
-    const fcta = document.createElement("span");
-    fcta.className = "f-cta";
-    fcta.textContent = "expand";
-    fhead.append(fchev, flabel, fcta);
-    const fbody = document.createElement("div");
-    fbody.className = "tl-fold-body";
-    fold.append(fhead, fbody);
     const footer = document.createElement("div");
     footer.className = "phase-group-footer";
     footer.hidden = true;
@@ -1402,95 +1378,14 @@
     // The footer is OUTSIDE the scroll body (a sibling after it) — sticky
     // bottom INSIDE the body made it float over the last row. As a sibling
     // it sits below the capped list and can never overlap a step.
-    fold.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();  // don't toggle the group's <details>
-      det.open = true;
-      // the CTA flips expand ↔ collapse; the middle rows ALWAYS live in
-      // the strip's body, the CSS flips fbody's display off the .open class
-      // (foldRows() only re-packs when the run grows — never on toggle)
-      const open = fold.classList.toggle("open");
-      fchev.textContent = open ? "▾" : "▸";
-      fcta.textContent = open ? "collapse" : "expand";
-      if (open) {
-        // auto-follow: land on the LAST revealed row (inside the strip)
-        const rows = fbody.querySelectorAll(":scope > .phase");
-        const last = rows[rows.length - 1];
-        if (last) {
-          const top = Math.max(0, Math.round(
-            last.getBoundingClientRect().top -
-            body.getBoundingClientRect().top + body.scrollTop));
-          body.scrollTo({ top, behavior: "smooth" });
-        }
-      }
-    });
-    // The footer is OUTSIDE the scroll body (a sibling after it) — sticky
-    // bottom INSIDE the body made it float over the last row. As a sibling
-    // it sits below the capped list and can never overlap a step. The fold
-    // strip is a child of the body; foldRows() parks it between the first
-    // 2 and last 2 rows and moves the middle rows into its own body.
-    body.appendChild(fold);
     det.appendChild(body);
     det.appendChild(footer);
     return det;
   }
-  // FOLD_AT: a run this long gets its middle folded (first 2 + last 2 stay)
-  const FOLD_AT = 6;
-  // fullRows(group): the ordered list of a group's phase rows, regardless
-  // of where they currently live (body vs the fold's own body). The strip
-  // sits in the body; rows parked in its fbody belong right after the rows
-  // that precede the strip.
-  function fullRows(group) {
-    const body = group.querySelector(".phase-group-body");
-    const fold = group.querySelector(".tl-fold");
-    if (!body) return [];
-    const children = [...body.children];
-    const foldPos = fold ? children.indexOf(fold) : -1;
-    const before = (foldPos < 0 ? children : children.slice(0, foldPos))
-      .filter((c) => c.classList.contains("phase"));
-    const after = (foldPos < 0 ? [] : children.slice(foldPos + 1))
-      .filter((c) => c.classList.contains("phase"));
-    const hidden = fold
-      ? [...fold.querySelectorAll(".tl-fold-body > .phase")]
-      : [];
-    return before.concat(hidden).concat(after);
-  }
-  // foldRows(group): park the strip between the first 2 and last 2 rows and
-  // put the MIDDLE rows into the strip's own body. The middle rows ALWAYS
-  // live there — expand/collapse is purely a CSS toggle on the strip's
-  // .open class (fbody hidden by default, shown indented when .open). No
-  // row movement on toggle, so the scroll-snap / auto-follow math is stable.
-  function foldRows(group) {
-    const body = group.querySelector(".phase-group-body");
-    const fold = group.querySelector(".tl-fold");
-    if (!fold) return;
-    const fbody = fold.querySelector(".tl-fold-body");
-    const rows = fullRows(group);
-    const n = rows.length;
-    fold.hidden = n < FOLD_AT;  // strip shows only for long runs
-    if (n < FOLD_AT) {
-      // run too short — the strip never shows, rows all in the body
-      fold.classList.remove("open", "err");
-      delete fold.dataset.errOpened;
-      rows.forEach((r) => body.insertBefore(r, fold));
-      while (fbody.firstChild) fbody.removeChild(fbody.firstChild);
-      return;
-    }
-    const keepHead = rows.slice(0, 2);
-    const keepTail = rows.slice(-2);
-    const middle = rows.slice(2, -2);
-    // head before the strip, tail after, middle permanently in the strip
-    keepHead.forEach((r) => body.insertBefore(r, fold));
-    keepTail.forEach((r) => body.appendChild(r));
-    middle.forEach((r) => fbody.appendChild(r));
-  }
-
   function refreshGroup(group, scrollNew = false) {
     const footer = group.querySelector(".phase-group-footer");
     const body = group.querySelector(".phase-group-body");
-    // count the FULL run — visible rows + rows parked in the fold body
-    const rows = [...group.querySelectorAll(".phase-group-body > details.phase"),
-                  ...group.querySelectorAll(".tl-fold-body > details.phase")];
+    const rows = [...group.querySelectorAll(".phase-group-body > details.phase")];
     const counts = {};
     let ok = 0, err = 0, running = 0;
     rows.forEach((r) => {
@@ -1510,46 +1405,6 @@
     if (running) { chip.textContent = "…"; chip.className = "phase-chip run"; }
     else if (err) { chip.textContent = "✗ " + err; chip.className = "phase-chip err"; }
     else { chip.textContent = "✓"; chip.className = "phase-chip ok"; }
-    // long-run fold: apply the strip for the current row count. A failed
-    // HIDDEN call overrides the fold ONCE — strip turns red + auto-expands
-    // (the boss must SEE the failure); after that the user owns the CTA.
-    const fold = group.querySelector(".tl-fold");
-    if (fold) {
-      const open = fold.classList.contains("open");
-      const hiddenErr = [...fold.querySelectorAll(".tl-fold-body .phase-verb")]
-        .some((v) => v.classList.contains("err"));
-      if (hiddenErr && !open && !fold.dataset.errOpened) {
-        fold.dataset.errOpened = "1";
-        fold.classList.add("open", "err");
-        const fchev = fold.querySelector(".f-chev");
-        const fcta = fold.querySelector(".f-cta");
-        if (fchev) fchev.textContent = "▾";
-        if (fcta) fcta.textContent = "collapse";
-      }
-      foldRows(group);
-      const flabel = fold.querySelector(".f-label");
-      // middle = the rows the fold OWNS — they ALWAYS live in the strip's
-      // body, so the full run minus head/tail is just fullRows() sliced
-      const full = fullRows(group);
-      const middle = full.length >= FOLD_AT ? full.slice(2, -2) : [];
-      if (flabel) {
-        const mcounts = {};
-        let merr = 0;
-        middle.forEach((r) => {
-          const v = (r.querySelector(".phase-verb") || {}).textContent || "?";
-          mcounts[v] = (mcounts[v] || 0) + 1;
-          const st = r.querySelector(".tl-st");
-          if (st && st.classList.contains("err")) merr++;
-        });
-        const mp = Object.entries(mcounts)
-          .map(([t, n]) => n > 1 ? n + "× " + t : t).join(" · ");
-        const status = merr
-          ? merr + " ✗"
-          : (middle.length ? "all ✓" : "");
-        flabel.textContent = middle.length + " more" +
-          (mp ? " · " + mp : "") + (status ? " · " + status : "");
-      }
-    }
     // overflow footer: only when the body is actually capped (more rows
     // than fit) — the CSS max-height decides, so measure it
     const overflow = rows.length > GROUP_MAX_ROWS &&

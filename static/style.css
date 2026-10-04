@@ -1426,34 +1426,7 @@ body.resizing-h iframe { pointer-events: none; }
   margin: 3px 0 2px 12px;
 }
 .phase-group-more { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
-/* long-run fold strip (mockup): dashed, click to expand the middle rows.
-   Sits INSIDE the scroll body between the first 2 and last 2 rows. */
-.tl-fold {
-  display: flex; flex-direction: column; gap: 4px; font-size: 11.5px;
-  color: var(--muted); padding: 5px 10px; margin: 2px 0;
-  border: 1px dashed var(--border); border-radius: 8px; cursor: pointer;
-  background: var(--panel-2); user-select: none;
-}
-.tl-fold:hover { border-color: var(--accent); color: var(--accent); }
-.tl-fold-head { display: flex; align-items: center; gap: 8px; }
-.tl-fold .f-chev { font-size: 10px; flex: none; }
-.tl-fold .f-label { flex: 1; min-width: 0; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
-.tl-fold .f-cta { color: var(--accent); font-weight: 600; flex: none; }
-.tl-fold.err { border-color: var(--err); }
-.tl-fold.err .f-label { color: var(--err); }
-.tl-fold-body {
-  display: none; flex-direction: column; gap: 2px;
-  padding: 4px 0 2px 10px; border-left: 2px solid var(--border);
-  margin-left: 2px;
-}
-/* the middle rows ALWAYS live in the strip's body; .open = expanded →
-   they render indented with a left rule. Collapsed → the strip is one
-   dashed line. */
-.tl-fold.open .tl-fold-body { display: flex; }
-.tl-fold-body > .phase { scroll-snap-align: none; }
-.tl-fold-body > .phase summary { padding-left: 0; }
-/* flat chronological tool rows (Steps tab + fold body):
+/* flat chronological tool rows (Steps tab):
    [phase pill] icon name arg… ✓ */
 .tl-step {
   display: flex; align-items: center; gap: 8px; font-size: 12px;
