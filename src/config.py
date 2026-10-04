@@ -56,7 +56,9 @@ class Settings:
     def __init__(self) -> None:
         self.title = os.environ.get("TITLE", "muji")
         self.brand = os.environ.get("BRAND", "muji")
-        self.creator = os.environ.get("CREATOR", "Jan (jblagana)")
+        self.creator = os.environ.get(
+            "CREATOR", "Jan (jblagana) — AI student at UP Diliman, Teaching Associate in EEEI"
+        )
         self.host = os.environ.get("HOST", "127.0.0.1")
         self.port = int(os.environ.get("PORT", "8321"))
 
