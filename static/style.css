@@ -319,10 +319,10 @@
   --scroll-thumb: rgba(40,80,60,.22); --scroll-thumb-hover: rgba(40,80,60,.38);
 }
 [data-theme="forest-dark"] {
-  --bg: #101211; --panel: #171a18; --panel-2: #1e2120;
-  --border: #2e322f; --text: #e0e2e0; --muted: #858a85;
+  --bg: #111111; --panel: #181818; --panel-2: #1f1f1f;  /* fully neutral surfaces — green lives only in the accent */
+  --border: #303030; --text: #e2e2e2; --muted: #8a8a8a;
   --accent: #6fb392; --accent-soft: #222826;
-  --code-bg: #1e2120; --user-bubble: #6fb392; --user-bubble-border: #6fb392;  /* mockup #4: solid accent bubble */
+  --code-bg: #1f1f1f; --user-bubble: #6fb392; --user-bubble-border: #6fb392;  /* mockup #4: solid accent bubble */
   --bubble-shadow: 0 10px 34px rgba(0,0,0,.45);  /* mockup #4 AI-bubble shadow */
   --plan-bubble: rgba(111,179,146,.10); --plan-bubble-border: rgba(111,179,146,.30);  /* forest-dark-tinted plan bubble */
   --act-bubble: rgba(111,179,146,.08); --act-bubble-border: rgba(111,179,146,.26);  /* forest-dark-tinted act bubble */
