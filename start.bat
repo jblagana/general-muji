@@ -30,9 +30,10 @@ rem Read the configured port from .env (default 8321) so start.bat respects it.
 set "PORT=8321"
 for /f "usebackq delims=" %%p in (`powershell -NoProfile -Command "$m=Select-String -Path .env -Pattern 'PORT=' -ErrorAction SilentlyContinue | Select-Object -First 1; if($m){ ($m.Line -split '=',2)[1].Trim() }"`) do set "PORT=%%p"
 
-rem First run: drop a permanent desktop shortcut (idempotent - only if missing).
+rem First run: drop a permanent desktop shortcut (idempotent - only if missing
+rem or pointing at the wrong start.bat, so a stale one self-heals on next launch).
 rem Uses the shell Desktop folder so OneDrive-redirected desktops still work.
-powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $p=Join-Path $d 'general-muji.lnk'; if(-not (Test-Path $p)){ $s=(New-Object -ComObject WScript.Shell).CreateShortcut($p); $s.TargetPath='%~dp0start.bat'; $s.WorkingDirectory='%~dp0'; $s.Description='muji - local agent'; $s.IconLocation='%~dp0static\favicon.ico'; $s.Save(); Write-Host 'Created desktop shortcut: general-muji.lnk' }"
+powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $p=Join-Path $d 'muji.lnk'; $t='%~dp0start.bat'; $s=(New-Object -ComObject WScript.Shell).CreateShortcut($p); if(-not (Test-Path $p) -or $s.TargetPath -ne $t){ $s.TargetPath=$t; $s.WorkingDirectory='%~dp0'; $s.Description='muji - local agent'; $s.IconLocation='%~dp0static\favicon.ico'; $s.Save(); Write-Host 'Created desktop shortcut: muji.lnk' }"
 
 if not exist ".venv\Scripts\python.exe" (
   echo [1/3] First run: creating local virtual environment...
