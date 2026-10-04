@@ -311,19 +311,41 @@
   --bg: #eef3ee; --panel: #f7faf7; --panel-2: #e2ece3;
   --border: #cfe0d2; --text: #20302a; --muted: #6f8579;
   --accent: #4f8a6b; --accent-soft: #d6e8dc;
-  --code-bg: #e2ece3; --user-bubble: #e2ece3; --user-bubble-border: #cfe0d2;
+  --code-bg: #e2ece3; --user-bubble: #4f8a6b; --user-bubble-border: #4f8a6b;  /* mockup #4: solid accent bubble */
+  --bubble-shadow: 0 10px 30px rgba(40,80,60,.10);  /* mockup #4 AI-bubble shadow */
+  --plan-bubble: rgba(214,232,220,.6); --plan-bubble-border: rgba(79,138,107,.35);  /* forest-tinted plan bubble */
+  --act-bubble: rgba(111,179,146,.16); --act-bubble-border: rgba(79,138,107,.35);  /* forest-tinted act bubble */
   --ok: #1a7f37; --err: #cf222e; --warn: #9a6700;
-  --shadow: 0 1px 3px rgba(40,80,60,.12);
   --scroll-thumb: rgba(40,80,60,.22); --scroll-thumb-hover: rgba(40,80,60,.38);
 }
 [data-theme="forest-dark"] {
   --bg: #101211; --panel: #171a18; --panel-2: #1e2120;
   --border: #2e322f; --text: #e0e2e0; --muted: #858a85;
   --accent: #6fb392; --accent-soft: #222826;
-  --code-bg: #1e2120; --user-bubble: #222826; --user-bubble-border: #2e322f;
+  --code-bg: #1e2120; --user-bubble: #6fb392; --user-bubble-border: #6fb392;  /* mockup #4: solid accent bubble */
+  --bubble-shadow: 0 10px 34px rgba(0,0,0,.45);  /* mockup #4 AI-bubble shadow */
+  --plan-bubble: rgba(111,179,146,.10); --plan-bubble-border: rgba(111,179,146,.30);  /* forest-dark-tinted plan bubble */
+  --act-bubble: rgba(111,179,146,.08); --act-bubble-border: rgba(111,179,146,.26);  /* forest-dark-tinted act bubble */
   --ok: #3fb950; --err: #f85149; --warn: #d29922;
-  --shadow: 0 1px 3px rgba(0,0,0,.45);
   --scroll-thumb: rgba(255,255,255,.16); --scroll-thumb-hover: rgba(255,255,255,.3);
+}
+/* Forest chat bubbles — mockup #4 (L145-150): user bubble = solid accent
+   with panel-colored text + uniform radius; AI bubble = panel + border +
+   the theme's --shadow; inline code in the accent bubble goes dark-tinted.
+   Scoped to forest only — light/dark keep their boss-chosen tints. */
+[data-theme="forest"] .msg-user .msg-bubble,
+[data-theme="forest-dark"] .msg-user .msg-bubble {
+  color: var(--panel);
+  border-radius: 14px;
+}
+[data-theme="forest"] .msg-user .msg-bubble code,
+[data-theme="forest-dark"] .msg-user .msg-bubble code {
+  background: rgba(0,0,0,.18);
+  color: inherit;
+}
+[data-theme="forest"] .msg-timeline .msg-content.bubble,
+[data-theme="forest-dark"] .msg-timeline .msg-content.bubble {
+  box-shadow: var(--bubble-shadow);
 }
 
 /* ── modern scrollbars (all scroll containers, theme-aware) ── */
