@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)" id="hljs-light"/>
   <link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark"/>
   <link rel="stylesheet" href="/static/vendor/katex.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=136"/>
+  <link rel="stylesheet" href="/static/style.css?v=137"/>
 </head>
 <body>
 <!-- Splash: shown on first paint (PWA cold-start), hidden by app.js once
@@ -358,6 +358,7 @@
     <div class="rp-lower" id="rp-lower">
       <div class="rp-tabs" id="rp-tabs-lower">
         <button class="rp-tab active" id="rp-tab-terminal" data-rl="terminal">Terminal</button>
+        <button class="rp-tab" id="rp-tab-steps" data-rl="steps">Steps</button>
         <button class="rp-tab" id="rp-tab-editor" data-rl="editor">Editor</button>
       </div>
       <div class="rp-lower-body">
@@ -367,6 +368,14 @@
             <span class="term-ps">PS&gt;</span>
             <input id="term-input" type="text" placeholder="PowerShell command — runs in this chat's folder" autocomplete="off" spellcheck="false">
             <button class="mini-btn" id="term-run" title="Run" aria-label="Run">⏎</button>
+          </div>
+        </div>
+        <div class="rp-pane" id="rp-pane-steps" hidden>
+          <div class="steps-pane" id="steps-pane">
+            <div class="steps-head">
+              <span>Steps</span><span class="steps-count" id="steps-count"></span>
+            </div>
+            <div class="steps-list" id="steps-list"></div>
           </div>
         </div>
         <div class="rp-pane" id="rp-pane-editor" hidden>
@@ -432,6 +441,6 @@
 <script src="/static/vendor/purify.min.js"></script>
 <script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/katex.min.js"></script>
-<script src="/static/app.js?v=167"></script>
+<script src="/static/app.js?v=168"></script>
 </body>
 </html>

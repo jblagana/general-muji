@@ -98,7 +98,7 @@
     // lower pane; a stale lower-pane "thinking" selection is dropped.
     rightTab: ["thinking", "files", "preview"].includes(localStorage.getItem("muji.rightTab"))
       ? localStorage.getItem("muji.rightTab") : "files",
-    lowerTab: ["terminal", "editor"].includes(localStorage.getItem("muji.lowerTab"))
+    lowerTab: ["terminal", "steps", "editor"].includes(localStorage.getItem("muji.lowerTab"))
       ? localStorage.getItem("muji.lowerTab")
       : "terminal",
     sidebarW: parseInt(localStorage.getItem("muji.sidebarW") || "280", 10) || 280,
@@ -163,8 +163,10 @@
     rpTabsUpper: $("rp-tabs-upper"), rpTabsLower: $("rp-tabs-lower"),
     rpTabFiles: $("rp-tab-files"), rpTabPreview: $("rp-tab-preview"),
     rpTabThinking: $("rp-tab-thinking"), rpTabTerminal: $("rp-tab-terminal"),
-    rpTabEditor: $("rp-tab-editor"),
+    rpTabSteps: $("rp-tab-steps"), rpTabEditor: $("rp-tab-editor"),
     paneFiles: $("rp-pane-files"), paneTerminal: $("rp-pane-terminal"),
+    paneSteps: $("rp-pane-steps"), stepsList: $("steps-list"),
+    stepsCount: $("steps-count"),
     paneThinking: $("rp-pane-thinking"), panePreview: $("rp-pane-preview"),
     paneEditor: $("rp-pane-editor"),
     termInput: $("term-input"), termRun: $("term-run"),
@@ -1042,12 +1044,12 @@
     el.progressSteps.innerHTML = "";
     p.chips = p.items.map((label) => {
       const chip = document.createElement("span");
-      chip.className = "p-chip";
+      chip.className = "pstep";
       const dot = document.createElement("span");
-      dot.className = "p-dot";
-      dot.textContent = "·";
+      dot.className = "pstep-dot";
+      dot.textContent = "○";
       const txt = document.createElement("span");
-      txt.className = "p-text";
+      txt.className = "pstep-txt";
       txt.textContent = label;
       chip.append(dot, txt);
       el.progressSteps.appendChild(chip);
@@ -1061,7 +1063,8 @@
     p.chips.forEach((chip, i) => {
       chip.classList.toggle("done", i < p.done);
       chip.classList.toggle("active", i === p.active && i >= p.done);
-      chip.querySelector(".p-dot").textContent = i < p.done ? "✓" : "·";
+      chip.querySelector(".pstep-dot").textContent =
+        i < p.done ? "✓" : (i === p.active && i >= p.done ? "●" : "○");
     });
   }
 
@@ -1094,7 +1097,9 @@
     if (p.mode === "plan" && p.items.length) {
       el.progressFill.style.width = (p.done / p.items.length * 100) + "%";
       paintProgressChips();
-      el.progressLabel.textContent = p.done + "/" + p.items.length + "  ·  " + secs + "s";
+      el.progressLabel.textContent =
+        "Step " + Math.min(p.done + 1, p.items.length) + " of " + p.items.length +
+        "  ·  " + secs + "s";
     } else {
       el.progressLabel.textContent = (p.label || "Working") +
         "  ·  tool step " + p.steps + "  ·  " + secs + "s";
@@ -1241,28 +1246,63 @@
   // `rawArgs` is the RAW args JSON (phrase target comes from it); `argsStr`
   // is the display fallback (shortenArgs output) used when the JSON is
   // missing/unparseable.
+  // phase tag for the mockup-style pill: plan (reading/exploring) /
+  // verify (test & check commands) / tool (everything else). The pill is
+  // the first thing in the row — the row reads [plan] 📖 Reading app.js ✓
+  function phaseOf(name, argsStr) {
+    const plan = ["read_file", "list_dir", "search_files", "local_search",
+                  "index_documents", "web_search", "fetch_url", "browser"];
+    if (plan.includes(name)) return "plan";
+    if (name === "run_command") {
+      let cmd = "";
+      try { cmd = String((JSON.parse(argsStr || "").command) || "").toLowerCase(); }
+      catch (e) { cmd = String(argsStr || "").toLowerCase(); }
+      if (/(test|check|verify|pytest|lint|node\s+--check)/.test(cmd)) return "verify";
+      // ship verbs get their own dimmed tag (mockup "done" phase)
+      if (/git (add|commit|push)/.test(cmd)) return "done";
+    }
+    return "tool";
+  }
+  function phaseIcon(name, ph) {
+    const byTool = {
+      read_file: "📖", list_dir: "📂", search_files: "🔍", local_search: "🔍",
+      index_documents: "🗂", web_search: "🌐", fetch_url: "🌐", browser: "🌐",
+      write_file: "✏️", edit_file: "✏️", run_command: "⚙️", ask_user: "❓",
+    };
+    return byTool[name] || (ph === "plan" ? "🔍" : "⚙️");
+  }
   function makePhase(name, argsStr, done, d, rawArgs) {
     const det = document.createElement("details");
     det.className = "phase";
     det.dataset.tool = name;
     det.dataset.args = rawArgs || argsStr || "";
+    const ph = phaseOf(name, rawArgs || argsStr || "");
     const sum = document.createElement("summary");
+    const tag = document.createElement("span");
+    tag.className = "tl-tag " + ph;
+    tag.textContent = ph;
+    const ico = document.createElement("span");
+    ico.className = "tl-ico";
+    ico.textContent = phaseIcon(name, ph);
     const label = document.createElement("span");
     label.className = "phase-title";
-    const ph = toolPhrase(name, rawArgs || argsStr || "");
+    const phrase = toolPhrase(name, rawArgs || argsStr || "");
     const verb = document.createElement("span");
     verb.className = "phase-verb";
-    verb.textContent = ph.verb;
+    verb.textContent = phrase.verb;
     label.appendChild(verb);
-    if (ph.target) {
+    if (phrase.target) {
       const tgt = document.createElement("span");
       tgt.className = "phase-target";
-      tgt.textContent = ph.target;
+      tgt.textContent = phrase.target;
       label.appendChild(tgt);
     }
-    sum.appendChild(label);
-    // status is COLOR on the verb itself — green = done, red = failed,
-    // accent = running (no ✓/✗ glyphs; the phrase IS the row)
+    const st = document.createElement("span");
+    st.className = "tl-st" + (done ? (d.ok ? " ok" : " err") : " run");
+    st.textContent = done ? (d.ok ? "✓" : "✗") : "…";
+    sum.append(tag, ico, label, st);
+    // status is COLOR on the verb too — green = done, red = failed,
+    // accent = running (the ✓/✗ glyph is the quick-scan, the color the glance)
     if (done) verb.classList.add(d.ok ? "ok" : "err");
     det.appendChild(sum);
     phaseOutput(det, done
@@ -1329,6 +1369,30 @@
         t = setTimeout(() => snapGroupToRow(body), 120);
       });
     }
+    // Long-run fold (mockup): when a run hits FOLD_AT consecutive tool
+    // calls, rows 3..N-2 collapse into ONE dashed strip parked BETWEEN the
+    // first 2 and last 2 rows — "5 more · 4× run_command · all ✓ · expand".
+    // Errors override: a failed hidden call turns the strip red and
+    // auto-expands. The strip lives INSIDE the scroll body (it takes the
+    // middle rows' slot); expand reveals them with a left rule. No
+    // re-render — rows move in/out of the fold body as the run grows.
+    const fold = document.createElement("div");
+    fold.className = "tl-fold";
+    fold.hidden = true;  // foldRows() un-hides it once the run crosses FOLD_AT
+    const fhead = document.createElement("div");
+    fhead.className = "tl-fold-head";
+    const fchev = document.createElement("span");
+    fchev.className = "f-chev";
+    fchev.textContent = "▸";
+    const flabel = document.createElement("span");
+    flabel.className = "f-label";
+    const fcta = document.createElement("span");
+    fcta.className = "f-cta";
+    fcta.textContent = "expand";
+    fhead.append(fchev, flabel, fcta);
+    const fbody = document.createElement("div");
+    fbody.className = "tl-fold-body";
+    fold.append(fhead, fbody);
     const footer = document.createElement("div");
     footer.className = "phase-group-footer";
     footer.hidden = true;
@@ -1338,15 +1402,95 @@
     // The footer is OUTSIDE the scroll body (a sibling after it) — sticky
     // bottom INSIDE the body made it float over the last row. As a sibling
     // it sits below the capped list and can never overlap a step.
+    fold.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();  // don't toggle the group's <details>
+      det.open = true;
+      // the CTA flips expand ↔ collapse; the middle rows ALWAYS live in
+      // the strip's body, the CSS flips fbody's display off the .open class
+      // (foldRows() only re-packs when the run grows — never on toggle)
+      const open = fold.classList.toggle("open");
+      fchev.textContent = open ? "▾" : "▸";
+      fcta.textContent = open ? "collapse" : "expand";
+      if (open) {
+        // auto-follow: land on the LAST revealed row (inside the strip)
+        const rows = fbody.querySelectorAll(":scope > .phase");
+        const last = rows[rows.length - 1];
+        if (last) {
+          const top = Math.max(0, Math.round(
+            last.getBoundingClientRect().top -
+            body.getBoundingClientRect().top + body.scrollTop));
+          body.scrollTo({ top, behavior: "smooth" });
+        }
+      }
+    });
+    // The footer is OUTSIDE the scroll body (a sibling after it) — sticky
+    // bottom INSIDE the body made it float over the last row. As a sibling
+    // it sits below the capped list and can never overlap a step. The fold
+    // strip is a child of the body; foldRows() parks it between the first
+    // 2 and last 2 rows and moves the middle rows into its own body.
+    body.appendChild(fold);
     det.appendChild(body);
     det.appendChild(footer);
     return det;
+  }
+  // FOLD_AT: a run this long gets its middle folded (first 2 + last 2 stay)
+  const FOLD_AT = 6;
+  // fullRows(group): the ordered list of a group's phase rows, regardless
+  // of where they currently live (body vs the fold's own body). The strip
+  // sits in the body; rows parked in its fbody belong right after the rows
+  // that precede the strip.
+  function fullRows(group) {
+    const body = group.querySelector(".phase-group-body");
+    const fold = group.querySelector(".tl-fold");
+    if (!body) return [];
+    const children = [...body.children];
+    const foldPos = fold ? children.indexOf(fold) : -1;
+    const before = (foldPos < 0 ? children : children.slice(0, foldPos))
+      .filter((c) => c.classList.contains("phase"));
+    const after = (foldPos < 0 ? [] : children.slice(foldPos + 1))
+      .filter((c) => c.classList.contains("phase"));
+    const hidden = fold
+      ? [...fold.querySelectorAll(".tl-fold-body > .phase")]
+      : [];
+    return before.concat(hidden).concat(after);
+  }
+  // foldRows(group): park the strip between the first 2 and last 2 rows and
+  // put the MIDDLE rows into the strip's own body. The middle rows ALWAYS
+  // live there — expand/collapse is purely a CSS toggle on the strip's
+  // .open class (fbody hidden by default, shown indented when .open). No
+  // row movement on toggle, so the scroll-snap / auto-follow math is stable.
+  function foldRows(group) {
+    const body = group.querySelector(".phase-group-body");
+    const fold = group.querySelector(".tl-fold");
+    if (!fold) return;
+    const fbody = fold.querySelector(".tl-fold-body");
+    const rows = fullRows(group);
+    const n = rows.length;
+    fold.hidden = n < FOLD_AT;  // strip shows only for long runs
+    if (n < FOLD_AT) {
+      // run too short — the strip never shows, rows all in the body
+      fold.classList.remove("open", "err");
+      delete fold.dataset.errOpened;
+      rows.forEach((r) => body.insertBefore(r, fold));
+      while (fbody.firstChild) fbody.removeChild(fbody.firstChild);
+      return;
+    }
+    const keepHead = rows.slice(0, 2);
+    const keepTail = rows.slice(-2);
+    const middle = rows.slice(2, -2);
+    // head before the strip, tail after, middle permanently in the strip
+    keepHead.forEach((r) => body.insertBefore(r, fold));
+    keepTail.forEach((r) => body.appendChild(r));
+    middle.forEach((r) => fbody.appendChild(r));
   }
 
   function refreshGroup(group, scrollNew = false) {
     const footer = group.querySelector(".phase-group-footer");
     const body = group.querySelector(".phase-group-body");
-    const rows = group.querySelectorAll(".phase-group-body > details.phase");
+    // count the FULL run — visible rows + rows parked in the fold body
+    const rows = [...group.querySelectorAll(".phase-group-body > details.phase"),
+                  ...group.querySelectorAll(".tl-fold-body > details.phase")];
     const counts = {};
     let ok = 0, err = 0, running = 0;
     rows.forEach((r) => {
@@ -1366,6 +1510,46 @@
     if (running) { chip.textContent = "…"; chip.className = "phase-chip run"; }
     else if (err) { chip.textContent = "✗ " + err; chip.className = "phase-chip err"; }
     else { chip.textContent = "✓"; chip.className = "phase-chip ok"; }
+    // long-run fold: apply the strip for the current row count. A failed
+    // HIDDEN call overrides the fold ONCE — strip turns red + auto-expands
+    // (the boss must SEE the failure); after that the user owns the CTA.
+    const fold = group.querySelector(".tl-fold");
+    if (fold) {
+      const open = fold.classList.contains("open");
+      const hiddenErr = [...fold.querySelectorAll(".tl-fold-body .phase-verb")]
+        .some((v) => v.classList.contains("err"));
+      if (hiddenErr && !open && !fold.dataset.errOpened) {
+        fold.dataset.errOpened = "1";
+        fold.classList.add("open", "err");
+        const fchev = fold.querySelector(".f-chev");
+        const fcta = fold.querySelector(".f-cta");
+        if (fchev) fchev.textContent = "▾";
+        if (fcta) fcta.textContent = "collapse";
+      }
+      foldRows(group);
+      const flabel = fold.querySelector(".f-label");
+      // middle = the rows the fold OWNS — they ALWAYS live in the strip's
+      // body, so the full run minus head/tail is just fullRows() sliced
+      const full = fullRows(group);
+      const middle = full.length >= FOLD_AT ? full.slice(2, -2) : [];
+      if (flabel) {
+        const mcounts = {};
+        let merr = 0;
+        middle.forEach((r) => {
+          const v = (r.querySelector(".phase-verb") || {}).textContent || "?";
+          mcounts[v] = (mcounts[v] || 0) + 1;
+          const st = r.querySelector(".tl-st");
+          if (st && st.classList.contains("err")) merr++;
+        });
+        const mp = Object.entries(mcounts)
+          .map(([t, n]) => n > 1 ? n + "× " + t : t).join(" · ");
+        const status = merr
+          ? merr + " ✗"
+          : (middle.length ? "all ✓" : "");
+        flabel.textContent = middle.length + " more" +
+          (mp ? " · " + mp : "") + (status ? " · " + status : "");
+      }
+    }
     // overflow footer: only when the body is actually capped (more rows
     // than fit) — the CSS max-height decides, so measure it
     const overflow = rows.length > GROUP_MAX_ROWS &&
@@ -1467,6 +1651,11 @@
     target.dataset.done = "1";
     const verb = target.querySelector(".phase-verb");
     if (verb) verb.classList.add(d.ok ? "ok" : "err");
+    const st = target.querySelector(".tl-st");
+    if (st) {
+      st.className = "tl-st " + (d.ok ? "ok" : "err");
+      st.textContent = d.ok ? "✓" : "✗";
+    }
     phaseOutput(target,
       (d.detail || "") + (d.ms != null ? "  (" + d.ms + " ms)" : ""));
     const group = target.closest("details.phase-group");
@@ -2673,9 +2862,13 @@
     el.wsList.innerHTML = "";
     const gen = document.createElement("div");
     gen.className = "ws-item" + (state.wsSel === null ? " active" : "");
+    const gic = document.createElement("span");
+    gic.className = "ws-ic";
+    gic.textContent = "◆";
+    gen.appendChild(gic);
     const gn = document.createElement("span");
     gn.className = "ws-name";
-    gn.textContent = "◆ General";
+    gn.textContent = "General";
     gen.appendChild(gn);
     gen.title = state.config ? "General chats (working folder: " + state.config.root_dir + ")" : "";
     gen.addEventListener("click", () => selectWorkspace(null));
@@ -2683,9 +2876,13 @@
     for (const w of data.workspaces) {
       const item = document.createElement("div");
       item.className = "ws-item" + (state.wsSel === w.id ? " active" : "");
+      const ic = document.createElement("span");
+      ic.className = "ws-ic";
+      ic.textContent = "📁";
+      item.appendChild(ic);
       const nm = document.createElement("span");
       nm.className = "ws-name";
-      nm.textContent = "📁 " + w.name;
+      nm.textContent = w.name;
       item.appendChild(nm);
       const pth = document.createElement("span");
       pth.className = "ws-path";
@@ -4627,12 +4824,23 @@
     const det = document.createElement("details");
     det.className = "think-block" + (t.live ? " live" : "");
     const sum = document.createElement("summary");
-    sum.textContent = "💭 " + (t.live ? "Thinking…" : "Thought");
+    sum.className = "think-head";
+    const chev = document.createElement("span");
+    chev.className = "chev";
+    chev.textContent = t.live ? "▼" : "▶";
+    sum.appendChild(chev);
+    const lab = document.createElement("span");
+    lab.textContent = "💭 " + (t.live ? "Thinking…" : "Thought");
+    sum.appendChild(lab);
     const body = document.createElement("div");
     body.className = "think-body";
     body.textContent = t.text;
     det.open = !!t.live;  // streaming block open, settled ones collapsed
     det.append(sum, body);
+    // keep the chevron in sync with the open state (user toggles it)
+    det.addEventListener("toggle", () => {
+      chev.textContent = det.open ? "▼" : "▶";
+    });
     return det;
   }
 
@@ -4653,6 +4861,50 @@
     if (nearBottom) box.scrollTop = box.scrollHeight;
   }
 
+  // ── Steps pane (lower tab): every tool call of this chat, flat and
+  //    chronological, phase-tagged — the mockup's "B · Steps tab" surface.
+  //    Data = the same p.term rows the Terminal tab shows (tool_end events
+  //    + the lazy tool_log sync), so nothing new is fetched.
+  function renderStepsPane() {
+    const list = el.stepsList;
+    const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+    const items = (state.sessionId && state.panels[state.sessionId] || {}).term || [];
+    el.stepsCount.textContent = items.length
+      ? items.length + " call" + (items.length > 1 ? "s" : "") : "";
+    list.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "term-empty";
+      empty.textContent = "No steps yet — every tool call lands here, " +
+        "chronological and phase-tagged.";
+      list.appendChild(empty);
+      return;
+    }
+    for (const t of items) {
+      const row = document.createElement("div");
+      row.className = "tl-step";
+      const ph = phaseOf(t.tool, t.args);
+      const tag = document.createElement("span");
+      tag.className = "tl-tag " + ph;
+      tag.textContent = ph;
+      const ico = document.createElement("span");
+      ico.className = "tl-ico";
+      ico.textContent = phaseIcon(t.tool, ph);
+      const name = document.createElement("span");
+      name.className = "tl-name";
+      name.textContent = t.tool || "tool";
+      const arg = document.createElement("span");
+      arg.className = "tl-arg";
+      arg.textContent = shortenArgs(t.args || "");
+      const st = document.createElement("span");
+      st.className = "tl-st " + (t.ok ? "ok" : "err");
+      st.textContent = t.ok ? "✓" : "✗";
+      row.append(tag, ico, name, arg, st);
+      list.appendChild(row);
+    }
+    if (nearBottom) list.scrollTop = list.scrollHeight;
+  }
+
   function panelToolEnd(sid, d) {
     if (!sid) return;
     const p = panel(sid);
@@ -4667,6 +4919,7 @@
     }
     if (sid === state.sessionId) {
       if (state.lowerTab === "terminal") renderTerminal();
+      if (state.lowerTab === "steps") renderStepsPane();
       // an edit just finished on the file the Editor shows → refresh it
       if (d.tool === "write_file" || d.tool === "edit_file") {
         const p = d.path || editorPathFromArgs(d.args);
@@ -4685,7 +4938,7 @@
     // tool_end events keep accumulating into p.term meanwhile, so a tab
     // opened mid-run still fills from the DB (this sync) without losing
     // anything.
-    if (state.lowerTab !== "terminal" || termLoaded.has(sid)) return;
+    if (!["terminal", "steps"].includes(state.lowerTab) || termLoaded.has(sid)) return;
     try {
       const res = await api("/api/sessions/" + encodeURIComponent(sid) + "/tool_log");
       if (!res.ok || sid !== state.sessionId) return;
@@ -4709,6 +4962,7 @@
       p.termIds = new Set(p.term.map((t) => t.id).filter(Boolean));
       termLoaded.add(sid);
       if (state.lowerTab === "terminal") renderTerminal();
+      if (state.lowerTab === "steps") renderStepsPane();
     } catch (e) { /* live events keep accumulating */ }
   }
 
@@ -5365,7 +5619,7 @@
   });
 
   const RP_UPPER_TABS = ["thinking", "files", "preview"];
-  const RP_LOWER_TABS = ["terminal", "editor"];
+  const RP_LOWER_TABS = ["terminal", "steps", "editor"];
 
   // ── Preview history: entering the Preview tab is a real browser-history
   // entry, so the (mouse) back/forward buttons walk
@@ -5430,8 +5684,10 @@
     el.rpTabsLower.querySelectorAll(".rp-tab").forEach((b) =>
       b.classList.toggle("active", b.dataset.rl === tab));
     el.paneTerminal.hidden = tab !== "terminal";
+    el.paneSteps.hidden = tab !== "steps";
     el.paneEditor.hidden = tab !== "editor";
     if (opts.auto && opts.btn) flashTab(opts.btn);
+    if (tab === "steps") renderStepsPane();
     // lazy tool_log: opening the Terminal tab is the moment the fetch is
     // worth paying (the sync is a no-op once termLoaded has the chat)
     if (tab === "terminal" && state.sessionId) syncTerminalFromDb(state.sessionId);
@@ -5446,6 +5702,7 @@
 
   function refreshPanel() {
     if (state.lowerTab === "terminal") renderTerminal();
+    if (state.lowerTab === "steps") renderStepsPane();
     if (state.rightTab === "files") {
       syncTreeToChat();
       syncHiddenToggle();
