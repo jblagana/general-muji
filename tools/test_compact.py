@@ -205,8 +205,36 @@ def test_unlimited_loop_condition():
     print("unlimited loop condition ok")
 
 
+def test_real_token_trigger():
+    """The trigger must prefer the provider's real prompt_tokens over the
+    char/4 estimate (Cline's approach): real 150k with a hot estimate must
+    NOT fire (that was the early-compaction bug), real 221k with a tiny
+    estimate MUST fire, and the estimate is the fallback when no real read
+    exists yet (round 1 / post-compact)."""
+    import src.agent as agent
+    src = Path(agent.__file__).read_text(encoding="utf-8")
+    assert "last_prompt_tokens: int | None = None" in src
+    assert "ctx_now = (last_prompt_tokens" in src
+    assert "else est_tokens(messages))" in src
+    assert "and ctx_now >= settings.compact_trigger" in src
+    # feed: the round's real read lands on the trigger variable
+    assert "last_prompt_tokens = prompt_tokens" in src
+    # reset: post-compact the stale pre-compact real number must not re-fire
+    assert src.index("last_prompt_tokens = None") > src.index("messages = compacted")
+
+    def ctx_now(last, msgs):
+        return last if last is not None else est_tokens(msgs)
+
+    hot_est = [{"role": "user", "content": "a" * 880000}]  # est = 220k
+    assert ctx_now(None, hot_est) >= 220000              # estimate fires (fallback)
+    assert ctx_now(150000, hot_est) < 220000             # real 150k: NO early fire
+    assert ctx_now(221000, [{"role": "user", "content": "hi"}]) >= 220000
+    print("real-token trigger ok")
+
+
 if __name__ == "__main__":
     test_est_tokens()
+    test_real_token_trigger()
     test_clear_stubs_old_only()
     test_clear_keeps_recent_tool_results()
     test_clear_text_mode_tool_result()

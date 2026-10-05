@@ -1627,6 +1627,13 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
         if plan:
             yield sse("plan", {"items": plan, "total": len(plan)})
             yield sse("status", {"text": f"Resumed at turn {turn + 1}…"})
+    # Real-token trigger (Cline's approach): the provider's own
+    # prompt_tokens from the PREVIOUS round is the true context size
+    # (system + conversation + tool results). The char/4 estimate runs
+    # hot on code/JSON-heavy output and made compaction fire early; the
+    # real number is only unknown for round 1 (no response yet) and
+    # right after a compaction (reset to None → estimate fallback).
+    last_prompt_tokens: int | None = None
     try:
         while settings.max_turns <= 0 or turn < settings.max_turns:
             turn += 1
@@ -1644,8 +1651,13 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
             # Context compaction: once the running conversation approaches
             # the model's limit, summarize its older part into one message
             # (the notes file + recent messages carry the rest).
+            # Trigger input: the provider's real prompt_tokens when we have
+            # them, char/4 estimate otherwise (round 1 / post-compact).
+            ctx_now = (last_prompt_tokens
+                       if last_prompt_tokens is not None
+                       else est_tokens(messages))
             if (settings.compact_enabled and turn > 1
-                    and est_tokens(messages) >= settings.compact_trigger):
+                    and ctx_now >= settings.compact_trigger):
                 # Rule-based loss-reducer FIRST (Anthropic clear_tool_uses):
                 # old tool results are the real token sink — stub them before
                 # the LLM sees anything. If that alone drops under the
@@ -1653,6 +1665,9 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                 freed = _clear_old_tool_results(messages, settings.compact_recent)
                 if freed:
                     log("info", f"cleared old tool results (~{freed // 4} est tokens freed)")
+                # After clearing, re-check the estimate (the real number
+                # predates the stubs; the estimate is the conservative
+                # post-clearing read).
                 if est_tokens(messages) >= settings.compact_trigger:
                     # `compacting: true` is the machine-readable signal for
                     # the topbar context pill (the status text is human-only)
@@ -1662,6 +1677,10 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                     compacted = await _compact_context(messages, log, session_id)
                     if compacted:
                         messages = compacted
+                        # the pre-compact real number is now stale (the
+                        # context shrank) — fall back to the estimate until
+                        # the next round's usage chunk gives a fresh read
+                        last_prompt_tokens = None
                         yield sse("status", {"text": f"Context compacted (~{est_tokens(messages)} est tokens)"})
                         try:
                             db.set_ctx_tokens(session_id, est_tokens(messages))
@@ -1807,6 +1826,8 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
             # live update.
             if prompt_tokens:
                 ctx_n = prompt_tokens
+                # feed next round's trigger (the real-token path)
+                last_prompt_tokens = prompt_tokens
             elif messages:
                 # est_tokens only covers the conversation — add the system
                 # prompt (it's most of a fresh chat's context)
