@@ -282,7 +282,7 @@
 .session-item.needs-question .s-title { color: var(--accent); font-weight: 600; }
 * { box-sizing: border-box; }
 :root {
-  --bg: #e2e9e2; --panel: #f7faf7; --panel-2: #e2ece3;  /* 2026-10-06: bg darkened a touch (was #eef3ee) */
+  --bg: #d7e0d7; --panel: #f7faf7; --panel-2: #e2ece3;  /* 2026-10-06: bg darkened again (was #e2e9e2, before #eef3ee) */
   --border: #cfe0d2; --text: #20302a; --muted: #6f8579;
   --accent: #4f8a6b; --accent-soft: #d6e8dc;
   --code-bg: #e2ece3; --user-bubble: #4f8a6b; --user-bubble-border: #4f8a6b;  /* forest: solid accent bubble (mockup #4) */
