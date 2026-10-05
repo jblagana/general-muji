@@ -539,10 +539,13 @@
     // per-bubble timestamp chip — mid-row, OUTSIDE the bubble: user = LEFT
     // of the bubble, muji = right (same .msg-time class, hover-revealed,
     // every bubble keeps its own even for consecutive messages)
-    const tm = document.createElement("time");
-    tm.className = "msg-time";
     const tstr = fmtMsgTime(ts);
-    if (tstr) { tm.textContent = tstr; tm.title = new Date(ts < 1e12 ? ts * 1000 : ts).toLocaleString(); }
+    const tm = tstr ? document.createElement("time") : null;  // no ts → no chip (an empty pill is a bug, not a feature)
+    if (tm) {
+      tm.className = "msg-time";
+      tm.textContent = tstr;
+      tm.title = new Date(ts < 1e12 ? ts * 1000 : ts).toLocaleString();
+    }
     if (t || !hasFiles) {
       // hover-revealed copy button (left of the bubble, after the chip)
       const cp = document.createElement("button");
@@ -553,9 +556,10 @@
       const b = document.createElement("div");
       b.className = "msg-bubble";
       renderMarkdown(b, t);
-      row.append(tm, cp, b);
+      if (tm) row.appendChild(tm);
+      row.append(cp, b);
       msg.appendChild(row);
-    } else {
+    } else if (tm) {
       // image-only send: no bubble row, but the chip still gets its own row
       row.appendChild(tm);
       msg.appendChild(row);
@@ -878,13 +882,12 @@
   // contains (consecutive turns keep their own chips; no dedup). The chip
   // lives in the seg ROW (right of the bubble, mid-row), not the bubble.
   function makeTimeChip(ts) {
+    const s = fmtMsgTime(ts);
+    if (!s) return null;  // no time → no chip (an empty pill is a bug, not a feature)
     const chip = document.createElement("time");
     chip.className = "msg-time";
-    const s = fmtMsgTime(ts);
-    if (s) {
-      chip.textContent = s;
-      chip.title = new Date(ts < 1e12 ? ts * 1000 : ts).toLocaleString();
-    }
+    chip.textContent = s;
+    chip.title = new Date(ts < 1e12 ? ts * 1000 : ts).toLocaleString();
     return chip;
   }
 
@@ -3659,7 +3662,7 @@
           autosize();
           clearAttachments();
           try { localStorage.removeItem("muji.draft"); } catch (e) {}
-          addUserMessage(text, files);  // empty text + files → thumbnail only
+          addUserMessage(text, files, Date.now());  // empty text + files → thumbnail only
           const entry = { text, files };
           (state.queues[state.sessionId] =
            state.queues[state.sessionId] || []).push(entry);
@@ -3723,7 +3726,7 @@
       autosize();
       clearAttachments();
       try { localStorage.removeItem("muji.draft"); } catch (e) {}
-      addUserMessage(text || "(attachment)", files);
+      addUserMessage(text || "(attachment)", files, Date.now());
       // sendNow's sync prefix sets state.processing=true before its first
       // await, so from here on the queue path is the duplicate guard —
       // the flag only covers the gap up to this point.
