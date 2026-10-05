@@ -139,12 +139,13 @@ class Settings:
         # mechanism, not a turn budget. Set >0 for a hard safety cap.
         self.max_turns = int(os.environ.get("MAX_TURNS", "0"))
         # Context compaction: summarize older messages once the estimated
-        # context reaches COMPACT_TRIGGER (tokens). Trigger sits well below
-        # the model's real limit so there is headroom for the summary
-        # call itself, the next user message and the next tool output.
+        # context reaches COMPACT_TRIGGER (tokens). Model limit (Qwen via
+        # vLLM) is 265k; trigger sits at ~83% of it (Cline's ratio) so there
+        # is headroom for the summary call itself, the next user message and
+        # the next tool output.
         self.compact_enabled = os.environ.get("COMPACT_ENABLED", "1") == "1"
-        self.compact_context_limit = int(os.environ.get("COMPACT_CONTEXT_LIMIT", "200000"))
-        self.compact_trigger = int(os.environ.get("COMPACT_TRIGGER", "160000"))
+        self.compact_context_limit = int(os.environ.get("COMPACT_CONTEXT_LIMIT", "265000"))
+        self.compact_trigger = int(os.environ.get("COMPACT_TRIGGER", "220000"))
         self.compact_recent = int(os.environ.get("COMPACT_RECENT", "4"))
         self.command_timeout = int(os.environ.get("COMMAND_TIMEOUT", "120"))
         self.approval_timeout = int(os.environ.get("APPROVAL_TIMEOUT", "180"))

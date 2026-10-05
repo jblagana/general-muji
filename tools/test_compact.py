@@ -176,8 +176,8 @@ def test_compact_prompt_preserves_workarounds():
 
 def test_settings():
     assert settings.compact_enabled is True
-    assert settings.compact_trigger == 160000
-    assert settings.compact_context_limit == 200000
+    assert settings.compact_trigger == 220000
+    assert settings.compact_context_limit == 265000
     assert settings.compact_recent == 4
     print("settings ok")
 

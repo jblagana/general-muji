@@ -45,7 +45,7 @@ class H(BaseHTTPRequestHandler):
                                       "model": "preview", "root_dir": ROOT,
                                       "fact_check": False, "auth_enabled": False,
                                       "tz_offset": 8,
-                                      "compact_trigger": 160000,
+                                      "compact_trigger": 220000,
                                       "compact_enabled": True}))
         if p == "/api/setup/status":
             return self._send(200, j({"configured": True}))
