@@ -4415,8 +4415,9 @@
   }
 
   // ── Theme ─────────────────────────────────────────────────────
-  // 4 themes, cycled by the topbar toggle: light → forest → dark → forest-dark.
-  const THEMES = ["light", "forest", "dark", "forest-dark"];
+  // 2 themes, cycled by the topbar toggle: forest ↔ forest-dark
+  // (old light/dark dropped 2026-10-05; their saved values remap below).
+  const THEMES = ["forest", "forest-dark"];
 
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
@@ -4429,8 +4430,11 @@
   function initTheme() {
     const saved = localStorage.getItem("muji.theme");
     const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark" : "light";
-    applyTheme(THEMES.includes(saved) ? saved : preferred);
+      ? "forest-dark" : "forest";
+    // remap dropped themes: dark → forest-dark, light → forest
+    const mapped = saved === "dark" ? "forest-dark"
+                 : saved === "light" ? "forest" : saved;
+    applyTheme(THEMES.includes(mapped) ? mapped : preferred);
   }
 
   // ── Preview panel ─────────────────────────────────────────────
@@ -7002,7 +7006,7 @@
   });
   el.addWorkspace.addEventListener("click", addWorkspace);
   el.themeToggle.addEventListener("click", () => {
-    const cur = document.documentElement.getAttribute("data-theme") || "light";
+    const cur = document.documentElement.getAttribute("data-theme") || "forest";
     const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
     applyTheme(next);
   });

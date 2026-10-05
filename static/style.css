@@ -282,42 +282,21 @@
 .session-item.needs-question .s-title { color: var(--accent); font-weight: 600; }
 * { box-sizing: border-box; }
 :root {
-  --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f0f2f5;
-  --border: #e2e5ea; --text: #1c2128; --muted: #6b7280;
-  --accent: #2563eb; --accent-soft: #eaf1fe;
-  --code-bg: #f0f2f5; --user-bubble: #eef3fc; --user-bubble-border: #d8e3f5;  /* option D: soft blue tint, chosen by the boss */
-  --plan-toggle: #eab308; --act-toggle: #22c55e;
-  --plan-bubble: rgba(253,230,138,0.42); --plan-bubble-border: rgba(250,204,21,0.42);
-  --act-bubble: rgba(187,247,208,0.42); --act-bubble-border: rgba(74,222,128,0.42);
-  --ok: #1a7f37; --err: #cf222e; --warn: #9a6700;
-  --shadow: 0 1px 3px rgba(0,0,0,.08);
-  --scroll-thumb: rgba(0,0,0,.18); --scroll-thumb-hover: rgba(0,0,0,.32);
-}
-[data-theme="dark"] {
-  --bg: #0f1115; --panel: #161920; --panel-2: #1c2029;
-  --border: #272d3a; --text: #c8ced8; --muted: #8b93a3;
-  --accent: #4f8cff; --accent-soft: #1a2436;
-  --code-bg: #10131a; --user-bubble: #262c38; --user-bubble-border: #333b4c;  /* option C: lighter slate, chosen by the boss */
-  --plan-toggle: #c99a2e; --act-toggle: #10b981;  /* option D: muted gold + dimmed surfaces, chosen by the boss */
-  --plan-bubble: rgba(201,154,46,0.06); --plan-bubble-border: rgba(201,154,46,0.22);
-  --act-bubble: rgba(52,211,153,0.06); --act-bubble-border: rgba(52,211,153,0.22);  /* option G2: dimmed surfaces, chosen by the boss */
-  --ok: #3fb950; --err: #f85149; --warn: #d29922;
-  --shadow: 0 1px 3px rgba(0,0,0,.4);
-  --scroll-thumb: rgba(255,255,255,.16); --scroll-thumb-hover: rgba(255,255,255,.3);
-}
-/* Forest (port of mockup #4, 2026-10-04): sage-green surfaces, green accent.
-   Declared AFTER [data-theme="dark"] so forest-dark overrides it. */
-[data-theme="forest"] {
   --bg: #eef3ee; --panel: #f7faf7; --panel-2: #e2ece3;
   --border: #cfe0d2; --text: #20302a; --muted: #6f8579;
   --accent: #4f8a6b; --accent-soft: #d6e8dc;
-  --code-bg: #e2ece3; --user-bubble: #4f8a6b; --user-bubble-border: #4f8a6b;  /* mockup #4: solid accent bubble */
-  --bubble-shadow: 0 10px 30px rgba(40,80,60,.10);  /* mockup #4 AI-bubble shadow */
-  --plan-bubble: rgba(214,232,220,.6); --plan-bubble-border: rgba(79,138,107,.35);  /* forest-tinted plan bubble */
-  --act-bubble: rgba(111,179,146,.16); --act-bubble-border: rgba(79,138,107,.35);  /* forest-tinted act bubble */
+  --code-bg: #e2ece3; --user-bubble: #4f8a6b; --user-bubble-border: #4f8a6b;  /* forest: solid accent bubble (mockup #4) */
+  --bubble-shadow: 0 10px 30px rgba(40,80,60,.10);  /* forest AI-bubble shadow */
+  --plan-toggle: #eab308; --act-toggle: #22c55e;
+  --plan-bubble: rgba(214,232,220,.6); --plan-bubble-border: rgba(79,138,107,.35);
+  --act-bubble: rgba(111,179,146,.16); --act-bubble-border: rgba(79,138,107,.35);
   --ok: #1a7f37; --err: #cf222e; --warn: #9a6700;
+  --shadow: 0 1px 3px rgba(0,0,0,.08);
   --scroll-thumb: rgba(40,80,60,.22); --scroll-thumb-hover: rgba(40,80,60,.38);
 }
+/* Forest-dark — the only dark theme (old "dark" dropped 2026-10-05).
+   Surfaces = the old dark theme's blue-cast slate (reads "cool clean",
+   cancels Night Light amber); green lives in accent, bubble, chips. */
 [data-theme="forest-dark"] {
   --bg: #0f1115; --panel: #161920; --panel-2: #1c2029;  /* copied from [data-theme="dark"] — the real blue cast (B−R 6–24) that reads "cool clean" and cancels Night Light amber */
   --border: #272d3a; --text: #c8ced8; --muted: #8b93a3;
@@ -327,7 +306,9 @@
   --final-bubble: #1a2126; --final-bubble-border: rgba(111,179,146,.55);  /* option A: final summary = dark slate + green border */
   --plan-bubble: rgba(111,179,146,.10); --plan-bubble-border: rgba(111,179,146,.30);  /* forest-dark-tinted plan bubble */
   --act-bubble: rgba(111,179,146,.08); --act-bubble-border: rgba(111,179,146,.26);  /* forest-dark-tinted act bubble */
+  --plan-toggle: #c99a2e; --act-toggle: #10b981;  /* muted gold + emerald (old dark's, kept) */
   --ok: #3fb950; --err: #f85149; --warn: #d29922;
+  --shadow: 0 1px 3px rgba(0,0,0,.4);
   --scroll-thumb: rgba(255,255,255,.16); --scroll-thumb-hover: rgba(255,255,255,.3);
 }
 /* Forest chat bubbles — mockup #4 (L145-150): user bubble = solid accent
@@ -1645,19 +1626,19 @@ body.resizing-h iframe { pointer-events: none; }
 .chip-plan:hover { background: color-mix(in srgb, var(--plan-toggle) 24%, transparent); }
 .chip:active { transform: scale(.97); }
 .chip.sent { opacity: .55; cursor: default; pointer-events: none; }
-/* dark theme: brighter fills so the pills stay readable on the dark bg */
-[data-theme="dark"] .chip-act {
+/* dark (forest-dark) theme: brighter fills so the pills stay readable on the dark bg */
+[data-theme="forest-dark"] .chip-act {
   color: var(--act-toggle);
   background: color-mix(in srgb, var(--act-toggle) 8%, transparent);
   border-color: color-mix(in srgb, var(--act-toggle) 30%, transparent);
 }
-[data-theme="dark"] .chip-plan {
+[data-theme="forest-dark"] .chip-plan {
   color: var(--plan-toggle);
   background: color-mix(in srgb, var(--plan-toggle) 8%, transparent);
   border-color: color-mix(in srgb, var(--plan-toggle) 30%, transparent);
 }
-[data-theme="dark"] .chip-act:hover { background: color-mix(in srgb, var(--act-toggle) 14%, transparent); }
-[data-theme="dark"] .chip-plan:hover { background: color-mix(in srgb, var(--plan-toggle) 14%, transparent); }
+[data-theme="forest-dark"] .chip-act:hover { background: color-mix(in srgb, var(--act-toggle) 14%, transparent); }
+[data-theme="forest-dark"] .chip-plan:hover { background: color-mix(in srgb, var(--plan-toggle) 14%, transparent); }
 
 /* files touched this turn — collapsed count line, expands to the chips */
 .msg-files { margin-top: 6px; }
@@ -1859,8 +1840,8 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
 .mode-btn.active:hover { background: var(--accent); color: #fff; filter: brightness(1.1); }
 #mode-toggle .mode-btn[data-mode="plan"].active { background: var(--plan-toggle); }
 #mode-toggle .mode-btn[data-mode="act"].active { background: var(--act-toggle); }
-/* dark-mode pills are bright (gold/emerald) → dark text for contrast */
-[data-theme="dark"] #mode-toggle .mode-btn.active { color: #0b0e13; }
+/* forest-dark pills are bright (gold/emerald) → dark text for contrast */
+[data-theme="forest-dark"] #mode-toggle .mode-btn.active { color: #0b0e13; }
 /* roast pills: the sprite icon inherits the pill color (muted → white on
    active), so the moon/smile/flame read in the same tint as the text */
 #roast-toggle .mode-btn { display: inline-flex; align-items: center; justify-content: center; }
@@ -2154,8 +2135,8 @@ span.link-broken { color: var(--muted); text-decoration: line-through; cursor: h
 
 /* theme icon toggle */
 /* forest-dark counts as dark: hide the right icon per brightness, not name */
-[data-theme="dark"] .ti-light, [data-theme="forest-dark"] .ti-light { display: none; }
-[data-theme="light"] .ti-dark, [data-theme="forest"] .ti-dark { display: none; }
+[data-theme="forest-dark"] .ti-light { display: none; }
+[data-theme="forest"] .ti-dark { display: none; }
 
 @media (max-width: 900px) {
   .vsplit { display: none; }
