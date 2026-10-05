@@ -1981,8 +1981,13 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
   cursor: pointer; padding: 8px 12px; font-size: 12px; font-weight: 600;
   color: var(--muted); background: var(--panel-2);
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  list-style: none;                 /* hide the native <details> triangle */
 }
+.think-block summary::-webkit-details-marker { display: none; }
+.think-block summary .mi { flex: none; }
 .think-block.live summary { color: var(--accent); }
+.think-block.live summary .mi { animation: think-pulse 1.4s ease-in-out infinite; }
+@keyframes think-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .think-body {
   white-space: pre-wrap; word-break: break-word; padding: 10px 12px;
   color: var(--muted); font-size: 12px; line-height: 1.55;

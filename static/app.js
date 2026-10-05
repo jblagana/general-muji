@@ -681,7 +681,7 @@
     turn.hint = document.createElement("a");
     turn.hint.className = "think-hint";
     turn.hint.hidden = true;
-    turn.hint.innerHTML = '<span class="mi mi-lightbulb"></span> thinking…';
+    turn.hint.innerHTML = '<span class="mi mi-brain"></span> thinking…';
     turn.hint.addEventListener("click", () => {
       setRightPanelOpen(true);
       setUpperTab("thinking");
@@ -993,7 +993,7 @@
     if (!turn.lastEventWasThinking) {
       turn.hintStart = Date.now();
       turn.hint.hidden = false;
-      turn.hint.innerHTML = '<span class="mi mi-lightbulb"></span> thinking…';
+      turn.hint.innerHTML = '<span class="mi mi-brain"></span> thinking…';
       turn.row.hidden = false;
       syncLane(turn);  // the hint grew the group — the lane must move NOW,
                        // not on the ResizeObserver's async tick
@@ -1004,7 +1004,7 @@
   function finalizeThinkingHint(turn) {
     if (turn.lastEventWasThinking && turn.hintStart) {
       const secs = Math.max(1, Math.round((Date.now() - turn.hintStart) / 1000));
-      turn.hint.innerHTML = '<span class="mi mi-lightbulb"></span> thought ' + secs + 's → Thinking tab';
+      turn.hint.innerHTML = '<span class="mi mi-brain"></span> thought ' + secs + 's → Thinking tab';
       turn.hintStart = 0;
     }
     turn.lastEventWasThinking = false;
@@ -1017,7 +1017,7 @@
     const lab = turn.chip.querySelector(".think-label");
     if (lab) lab.textContent = "Done";
     turn.hint.hidden = false;
-    turn.hint.innerHTML = '<span class="mi mi-lightbulb"></span> thought → Thinking tab';
+    turn.hint.innerHTML = '<span class="mi mi-brain"></span> thought → Thinking tab';
     turn.row.hidden = false;
     // In loadHistory the root isn't in the DOM yet (the col would measure
     // 0) — watchGroup's syncLane after appendChild sets the real --lane
@@ -3027,11 +3027,11 @@
       if (ui.thinking) {
         // mid-thinking at snapshot time — live thinking frames continue the
         // same hint (the next non-thinking frame finalizes it as usual)
-        turn.hint.innerHTML = '<span class="mi mi-lightbulb"></span> thinking…';
+        turn.hint.innerHTML = '<span class="mi mi-brain"></span> thinking…';
         turn.lastEventWasThinking = true;
         turn.hintStart = Date.now();
       } else {
-        turn.hint.innerHTML = '<span class="mi mi-lightbulb"></span> thought → Thinking tab';
+        turn.hint.innerHTML = '<span class="mi mi-brain"></span> thought → Thinking tab';
       }
       const p = panel(sid);
       p.think.push({ text: draft.thinking, live: true, start: Date.now() });
@@ -4703,12 +4703,8 @@
     det.className = "think-block" + (t.live ? " live" : "");
     const sum = document.createElement("summary");
     sum.className = "think-head";
-    const chev = document.createElement("span");
-    chev.className = "chev";
-    chev.textContent = t.live ? "▼" : "▶";
-    sum.appendChild(chev);
     const lab = document.createElement("span");
-    lab.appendChild(icon("lightbulb"));
+    lab.appendChild(icon("brain"));  // brain = thinking; pulses while live
     lab.appendChild(document.createTextNode(" " + (t.live ? "Thinking…" : "Thought")));
     sum.appendChild(lab);
     const body = document.createElement("div");
@@ -4716,10 +4712,6 @@
     body.textContent = t.text;
     det.open = !!t.live;  // streaming block open, settled ones collapsed
     det.append(sum, body);
-    // keep the chevron in sync with the open state (user toggles it)
-    det.addEventListener("toggle", () => {
-      chev.textContent = det.open ? "▼" : "▶";
-    });
     return det;
   }
 
