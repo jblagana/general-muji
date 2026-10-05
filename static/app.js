@@ -3409,7 +3409,7 @@
         v.done = true;
         v.knownActive = false;
         if (turn && !turn.finished) {
-          finishTurn(turn, d.content, d.files);
+          finishTurn(turn, d.content, d.files, sid);
           // ended with NO final answer (empty content, no files) — treat it
           // like a stop: offer the chip + inline ↻ (only when nothing is
           // queued behind it; a draining queue will start the next run)
@@ -3597,8 +3597,9 @@
     chatStripText();  // the collapsed strip's live dot follows the run state
   }
 
-  function finishTurn(turn, content, files) {
+  function finishTurn(turn, content, files, sid) {
     turn.finished = true;
+    closeThinkBurst(sid || state.sessionId);  // belt-and-braces: run ended, nothing may stay "live"
     finalizeThinkingHint(turn);
     settleThink(turn);
     settleGroups(turn);        // collapse finished tool groups FIRST, so the lane /
@@ -4686,7 +4687,13 @@
     const p = state.panels[sid];
     if (!p) return;
     const last = p.think[p.think.length - 1];
-    if (last && last.live) { last.live = false; last.start = 0; }
+    if (last && last.live) {
+      last.live = false; last.start = 0;
+      // re-render NOW — without this the last-drawn "live" block keeps
+      // pulsing after the burst settled (no later thinking event to
+      // trigger a render, so the stale DOM sat there until a tab switch)
+      scheduleThinkRender();
+    }
   }
 
   function scheduleThinkRender() {
