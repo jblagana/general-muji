@@ -1250,7 +1250,7 @@ body.resizing-h iframe { pointer-events: none; }
    dusk without touching the panel/bubble surfaces (Option 3, radius B) */
 [data-theme="forest-dark"] .chat-scroll {
   background:
-    radial-gradient(72% 58% at 50% 42%, rgba(127,216,168,.17) 0%, rgba(127,216,168,.06) 55%, transparent 78%),
+    radial-gradient(72% 58% at 50% 42%, rgba(127,216,168,.12) 0%, rgba(127,216,168,.04) 55%, transparent 78%),
     #0f1115;
 }
 /* mint pool (light/forest only): the flat #eef3ee chat background reads
