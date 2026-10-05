@@ -1165,6 +1165,45 @@ def est_tokens(messages: list[dict]) -> int:
     return n // 4
 
 
+def _clear_old_tool_results(messages: list[dict], recent: int) -> int:
+    """Rule-based loss-reducer (Anthropic's `clear_tool_uses` mechanism):
+    replace the content of TOOL messages older than the keep-tail with a
+    one-line stub. The tool CALLS (assistant messages) and all conversation
+    text are untouched — the model can re-run any tool it needs, and the UI
+    already has the full output (tool_end / parts). Returns chars freed."""
+    if len(messages) <= 1 + recent:
+        return 0
+    # tool_call_id -> tool name, so the stub keeps the receipt
+    names: dict[str, str] = {}
+    for m in messages:
+        for tc in (m.get("tool_calls") or []):
+            names[tc.get("id") or ""] = (tc.get("function") or {}).get("name", "?")
+    boundary = len(messages) - recent
+    freed = 0
+    for i in range(1, boundary):
+        m = messages[i]
+        content = m.get("content")
+        if m.get("role") == "tool":
+            text = _content_text(content)
+            if not text or text.startswith("[cleared:"):
+                continue  # empty or already stubbed (idempotent)
+            name = names.get(m.get("tool_call_id") or "", "?")
+            stub = f"[cleared: {name} — {len(text):,} chars; re-run the tool if needed]"
+            m["content"] = stub
+            freed += max(0, len(text) - len(stub))
+        elif (m.get("role") == "user" and isinstance(content, str)
+              and content.startswith("TOOL_RESULT:")):
+            # text-mode: tool results ride user-role TOOL_RESULT messages
+            body = content[len("TOOL_RESULT:"):]
+            if body.startswith("\n[cleared:") or body.startswith("[cleared:"):
+                continue
+            stub = ("TOOL_RESULT:\n[cleared — "
+                    f"{len(body):,} chars; re-run the tool if needed]")
+            m["content"] = stub
+            freed += max(0, len(body) - len(stub))
+    return freed
+
+
 COMPACT_PROMPT = (
     "You are the context-compaction step of an agent harness. Summarize the "
     "CONVERSATION below (an agent working for the user, with its tool "
@@ -1175,6 +1214,8 @@ COMPACT_PROMPT = (
     "- files created/modified/important: path + purpose (one line each)\n"
     "- current state: what is done, what is in progress, what is next\n"
     "- open questions / unresolved errors\n"
+    "- workarounds and discovered fixes: script quirks, env gotchas, tool "
+    "workarounds — the class of detail that dies by default\n"
     "Drop raw tool outputs, file dumps, and intermediate reasoning — file "
     "contents can always be re-read. Be dense and factual; bullets are "
     "fine. Output ONLY the summary, starting with the line "
@@ -1605,19 +1646,27 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
             # (the notes file + recent messages carry the rest).
             if (settings.compact_enabled and turn > 1
                     and est_tokens(messages) >= settings.compact_trigger):
-                # `compacting: true` is the machine-readable signal for the
-                # topbar context pill (the status text is human-only)
-                yield sse("status", {"text": "Context large — compacting…",
-                                     "compacting": True})
-                log("info", f"compacting context (~{est_tokens(messages)} est tokens)")
-                compacted = await _compact_context(messages, log, session_id)
-                if compacted:
-                    messages = compacted
-                    yield sse("status", {"text": f"Context compacted (~{est_tokens(messages)} est tokens)"})
-                    try:
-                        db.set_ctx_tokens(session_id, est_tokens(messages))
-                    except Exception:  # noqa: BLE001 — meter must never kill the turn
-                        pass
+                # Rule-based loss-reducer FIRST (Anthropic clear_tool_uses):
+                # old tool results are the real token sink — stub them before
+                # the LLM sees anything. If that alone drops under the
+                # trigger, the lossy summary is skipped entirely.
+                freed = _clear_old_tool_results(messages, settings.compact_recent)
+                if freed:
+                    log("info", f"cleared old tool results (~{freed // 4} est tokens freed)")
+                if est_tokens(messages) >= settings.compact_trigger:
+                    # `compacting: true` is the machine-readable signal for
+                    # the topbar context pill (the status text is human-only)
+                    yield sse("status", {"text": "Context large — compacting…",
+                                         "compacting": True})
+                    log("info", f"compacting context (~{est_tokens(messages)} est tokens)")
+                    compacted = await _compact_context(messages, log, session_id)
+                    if compacted:
+                        messages = compacted
+                        yield sse("status", {"text": f"Context compacted (~{est_tokens(messages)} est tokens)"})
+                        try:
+                            db.set_ctx_tokens(session_id, est_tokens(messages))
+                        except Exception:  # noqa: BLE001 — meter must never kill the turn
+                            pass
             # run-state checkpoint: a restart/crash mid-task can re-enter the
             # loop exactly here (saved AFTER compaction, so the persisted
             # conversation is the small one). One small write per turn.
