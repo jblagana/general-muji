@@ -1204,6 +1204,81 @@ def _clear_old_tool_results(messages: list[dict], recent: int) -> int:
     return freed
 
 
+def _is_context_overflow(msg: str) -> bool:
+    """Message-level check for a context-window rejection (the
+    `LLMError` from llm.py carries only `str(e)`). The trigger check
+    runs BEFORE the call, so a big tool result landing after it — or a
+    server limit lower than the assumed 265k — still 400s; recovery
+    catches exactly these. Vocabulary from OpenAI/vLLM/SGLang error
+    strings (tool-verified against vLLM's `max_tokens` message).
+    Two tiers: strong phrases match anywhere; weak verbs ('exceed',
+    'too long') only count NEXT TO a context/token/length word. Rate-
+    limit / quota strings are excluded up front — 'rate limit exceeded'
+    contains both a weak verb and 'limit', and must NOT trip recovery."""
+    low = (msg or "").lower()
+    if any(k in low for k in ("rate limit", "rate_limit", "too many requests",
+                              "quota", " 429", "insufficient")):
+        return False
+    if any(k in low for k in (
+            "context length", "context_length", "context size",
+            "context window", "maximum context", "max context",
+            "too many tokens", "token limit",
+            "reduce the length", "maximum number of tokens")):
+        return True
+    for verb in ("exceed", "too long"):
+        i = low.find(verb)
+        while i != -1:
+            window = low[max(0, i - 25):i + len(verb) + 25]
+            if any(w in window for w in
+                   ("context", "token", "length", "limit")):
+                return True
+            i = low.find(verb, i + 1)
+    return False
+
+
+def _hard_truncate(messages: list[dict], budget_chars: int) -> int:
+    """Deterministic overflow-recovery shrink (no LLM — Cline: recovery
+    "must not depend on another successful LLM request"): drop OLDEST
+    middle messages until the estimate fits `budget_chars` (~4 chars/
+    token). `messages` is [system, ...history...]. The system message
+    and the last 8 (≈ the compact_recent tail + its tool pairs) are
+    never touched. An assistant message with tool_calls is only dropped
+    together with its tool responses (orphaning either side is an API
+    400), and any orphaned tool message left at the front of the
+    history is removed. Returns messages dropped."""
+    if est_tokens(messages) * 4 <= budget_chars:
+        return 0
+    keep_tail = 8
+    tail = len(messages) - keep_tail
+    if tail <= 1:
+        return 0
+    # tool_call_id -> index of the tool response, for pair-safe drops
+    tool_idx: dict[str, int] = {}
+    for i in range(1, len(messages)):
+        tid = messages[i].get("tool_call_id")
+        if tid:
+            tool_idx[tid] = i
+    drop: set[int] = set()
+    i = 1
+    while i < tail and est_tokens(messages) * 4 > budget_chars:
+        m = messages[i]
+        if m.get("role") == "assistant":
+            for tc in (m.get("tool_calls") or []):
+                j = tool_idx.get(tc.get("id") or "")
+                if j is not None and j < tail:
+                    drop.add(j)
+        drop.add(i)
+        i += 1
+    for j in sorted(drop, reverse=True):
+        del messages[j]
+    # pair-safe drops can leave a tool response whose call was dropped
+    # (the call sat in the keep-tail window) — an orphan at the front
+    # of the history is an API 400
+    while len(messages) > 1 and messages[1].get("role") == "tool":
+        del messages[1]
+    return len(drop)
+
+
 COMPACT_PROMPT = (
     "You are the context-compaction step of an agent harness. Summarize the "
     "CONVERSATION below (an agent working for the user, with its tool "
@@ -1634,6 +1709,12 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
     # real number is only unknown for round 1 (no response yet) and
     # right after a compaction (reset to None → estimate fallback).
     last_prompt_tokens: int | None = None
+    # Overflow-recovery budget (Cline's `overflowRecovery`): the trigger
+    # check runs BEFORE the call, so a big tool result landing after it —
+    # or a server limit lower than the assumed 265k — still 400s. On a
+    # context-overflow error we shrink by rule (no LLM — the summarizer
+    # would hit the same wall) and retry the SAME round once.
+    overflow_retried = False
     try:
         while settings.max_turns <= 0 or turn < settings.max_turns:
             turn += 1
@@ -1796,6 +1877,46 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                                "content": build_system(cwd, True, plan_mode, roast)}
                 yield sse("status", {"text": "Falling back to text tool protocol…"})
                 continue
+            except LLMError as e:
+                # Overflow recovery (Cline's `overflowRecovery`): the
+                # trigger check ran BEFORE this call, so a big tool result
+                # that landed after it — or a server limit lower than the
+                # assumed 265k — still 400s. Shrink by rule (deterministic,
+                # NO LLM — the summarizer would hit the same wall) and
+                # retry the round ONCE. Only when nothing was streamed yet
+                # (a mid-stream overflow with partial output is unretryable
+                # here — the consumer already saw tokens); otherwise
+                # re-raise to the outer handler.
+                if (_is_context_overflow(str(e))
+                        and not overflow_retried
+                        and not buf and not draft and not tool_calls
+                        and len(thinking_text) == think_t0):
+                    overflow_retried = True
+                    last_prompt_tokens = None  # pre-overflow read is stale
+                    yield sse("status", {"text": "Context overflow — recovering…",
+                                         "compacting": True})
+                    # 1) aggressive clear: stub ALL old tool outputs
+                    #    (keep-tail 1 = nothing is "recent" enough to keep)
+                    freed = _clear_old_tool_results(messages, 1)
+                    # 2) still over? hard-truncate the oldest middle
+                    #    messages down to a safe budget (45k chars ≈ 11k
+                    #    tokens under the 220k trigger)
+                    if est_tokens(messages) * 4 > (settings.compact_trigger - 11000) * 4:
+                        dropped = _hard_truncate(
+                            messages, (settings.compact_trigger - 11000) * 4)
+                        log("warn", f"overflow recovery: cleared ~{freed // 4} "
+                                    f"est tokens, dropped {dropped} old messages")
+                    else:
+                        log("warn", f"overflow recovery: cleared ~{freed // 4} "
+                                    f"est tokens (no truncation needed)")
+                    yield sse("status",
+                              {"text": f"Context recovered (~{est_tokens(messages)} est tokens)"})
+                    try:
+                        db.set_ctx_tokens(session_id, est_tokens(messages))
+                    except Exception:  # noqa: BLE001 — meter must never kill the turn
+                        pass
+                    continue  # retry the round with the shrunken context
+                raise
             # LLM latency for this round: stream start → last frame (covers
             # thinking + tokens + tool args). Persisted like tool ms so
             # "when was the model slowest" is answerable from the DB.

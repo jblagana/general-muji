@@ -232,6 +232,101 @@ def test_real_token_trigger():
     print("real-token trigger ok")
 
 
+def test_overflow_detection():
+    """_is_context_overflow must catch the real provider error strings
+    (OpenAI/vLLM/SGLang) and NOT catch unrelated LLM errors."""
+    from src.agent import _is_context_overflow
+    hits = [
+        "Error code: 400 - {'error': {'message': 'This model's maximum "
+        "context length is 262144 tokens. However, your messages "
+        "contained 270000 tokens', 'type': 'invalid_request_error'}}",  # OpenAI
+        "Maximum context length is 262144 tokens, but you requested "
+        "270000 (260000 output + 10000 input)",                        # vLLM
+        "This model's maximum context length is 32768 tokens. However, "
+        "you requested 2048 output tokens and your prompt contains "
+        "32000 input tokens",                                            # SGLang
+        "context window exceeded",
+        "reduce the length of the messages",
+    ]
+    for h in hits:
+        assert _is_context_overflow(h), h
+    # rate-limit / unrelated strings must NOT trip recovery: 'rate limit
+    # exceeded' contains both a weak verb and 'limit' — the exclusion
+    # tier is what keeps it out
+    for m in ("Model error: 429 rate limit exceeded for API key",
+              "connection timed out after 30s",
+              "no such model: qwen3-235b",
+              "tool 'run_command' not found"):
+        assert not _is_context_overflow(m), m
+    print("overflow detection ok")
+
+
+def test_hard_truncate():
+    """_hard_truncate: drops oldest MIDDLE messages (system + tail 8
+    survive), drops tool responses WITH their assistant call (no orphans),
+    strips an orphaned tool message left at the front, and is a no-op
+    when already under budget."""
+    from src.agent import _hard_truncate
+    msgs = [{"role": "system", "content": "SYS"}]
+    for i in range(20):  # 20 old (call, result) pairs
+        msgs.append({"role": "assistant", "content": "",
+                     "tool_calls": [{"id": f"call_{i}", "type": "function",
+                                     "function": {"name": "read_file",
+                                                  "arguments": "{}"}}]})
+        msgs.append({"role": "tool", "tool_call_id": f"call_{i}",
+                     "content": "x" * 20000})
+    for i in range(8):  # keep-tail
+        msgs.append({"role": "user", "content": f"tail{i}"})
+    n0 = len(msgs)
+    dropped = _hard_truncate(msgs, 100000)  # 400k chars in, 100k budget
+    assert dropped > 0
+    assert len(msgs) == n0 - dropped
+    assert msgs[0] == {"role": "system", "content": "SYS"}
+    assert [m["content"] for m in msgs[-8:]] == [f"tail{i}" for i in range(8)]
+    # no orphaned tool messages: every tool response's call id must exist
+    ids = set()
+    for m in msgs:
+        for tc in (m.get("tool_calls") or []):
+            ids.add(tc.get("id"))
+    for m in msgs[1:]:
+        if m.get("role") == "tool":
+            assert m["tool_call_id"] in ids, "orphaned tool response"
+    # already-under-budget: no-op
+    small = [{"role": "system", "content": "SYS"},
+             {"role": "user", "content": "hi"}]
+    assert _hard_truncate(small, 100000) == 0
+    assert small[1]["content"] == "hi"
+    print("hard truncate ok")
+
+
+def test_recovery_wiring():
+    """The agent loop must wire recovery: overflow flag init, the
+    LLMError catch after the ToolUnsupported catch, the no-partial-output
+    guard, the aggressive clear + hard-truncate, the once-only retry,
+    and the re-raise for everything else."""
+    import src.agent as agent
+    src = Path(agent.__file__).read_text(encoding="utf-8")
+    assert "overflow_retried = False" in src
+    assert "except LLMError as e:" in src
+    assert src.index("except LLMError as e:") > src.index("except ToolUnsupported as e:")
+    assert "_is_context_overflow(str(e))" in src
+    assert "not overflow_retried" in src
+    # no-partial-output guard: text, tool timeline, tool calls, AND thinking
+    assert "not buf and not draft and not tool_calls" in src
+    assert "len(thinking_text) == think_t0" in src
+    # shrink steps: aggressive clear (keep-tail 1) then hard truncate
+    assert "_clear_old_tool_results(messages, 1)" in src
+    assert "_hard_truncate(" in src
+    # the retry is the SAME round (continue, not a fresh user turn) and
+    # the stale real read is reset
+    assert "last_prompt_tokens = None  # pre-overflow read is stale" in src
+    # a second overflow (or non-overflow LLMError) re-raises to the
+    # outer handler — the turn dies instead of looping forever
+    tail = src[src.index("except LLMError as e:"):]
+    assert "raise" in tail
+    print("recovery wiring ok")
+
+
 if __name__ == "__main__":
     test_est_tokens()
     test_real_token_trigger()
@@ -245,4 +340,7 @@ if __name__ == "__main__":
     test_compact_too_short()
     test_settings()
     test_unlimited_loop_condition()
+    test_overflow_detection()
+    test_hard_truncate()
+    test_recovery_wiring()
     print("ALL OK")
