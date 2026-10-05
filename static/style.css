@@ -365,7 +365,7 @@
 html, body { height: 100%; margin: 0; }
 body {
   font-family: -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-  background: var(--bg); color: var(--text); font-size: 14.5px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--text); font-size: 14.5px;
 }
 /* Taskbar safe zone (v3): when the viewport extends under the Windows
    taskbar (F11 fullscreen, or any window covering the whole screen),
