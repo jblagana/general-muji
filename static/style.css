@@ -321,9 +321,10 @@
 [data-theme="forest-dark"] {
   --bg: #0f1115; --panel: #161920; --panel-2: #1c2029;  /* copied from [data-theme="dark"] — the real blue cast (B−R 6–24) that reads "cool clean" and cancels Night Light amber */
   --border: #272d3a; --text: #c8ced8; --muted: #8b93a3;
-  --accent: #6fb392; --accent-soft: #1a2436;
-  --code-bg: #10131a; --user-bubble: #6fb392; --user-bubble-border: #6fb392;  /* mockup #4: solid accent bubble */
+  --accent: #6fb392; --accent-soft: rgba(111,179,146,.13);  /* green-soft: active chat row + hover states glow green, not the dark theme's blue */
+  --code-bg: #10131a; --user-bubble: #2e5c48; --user-bubble-border: #2e5c48;  /* option B: deep forest-green solid bubble (not the bright #6fb392) */
   --bubble-shadow: 0 10px 34px rgba(0,0,0,.45);  /* mockup #4 AI-bubble shadow */
+  --final-bubble: #1a2126; --final-bubble-border: rgba(111,179,146,.55);  /* option A: final summary = dark slate + green border */
   --plan-bubble: rgba(111,179,146,.10); --plan-bubble-border: rgba(111,179,146,.30);  /* forest-dark-tinted plan bubble */
   --act-bubble: rgba(111,179,146,.08); --act-bubble-border: rgba(111,179,146,.26);  /* forest-dark-tinted act bubble */
   --ok: #3fb950; --err: #f85149; --warn: #d29922;
@@ -338,6 +339,11 @@
   color: var(--panel);
   border-radius: 14px;
 }
+/* option B: the deep green is darker than the light forest's, so the
+   panel-colored text would vanish — forest-dark gets light text instead */
+[data-theme="forest-dark"] .msg-user .msg-bubble {
+  color: #e6f2ea;
+}
 [data-theme="forest"] .msg-user .msg-bubble code,
 [data-theme="forest-dark"] .msg-user .msg-bubble code {
   background: rgba(0,0,0,.18);
@@ -346,6 +352,14 @@
 [data-theme="forest"] .msg-timeline .msg-content.bubble,
 [data-theme="forest-dark"] .msg-timeline .msg-content.bubble {
   box-shadow: var(--bubble-shadow);
+}
+/* final summary bubble (forest-dark only): dark slate + green border
+   (option A) instead of the mode tint — the mode still shows on the
+   chips, the summary reads as a distinct surface */
+[data-theme="forest-dark"] .msg-timeline .msg-content.bubble.mode-plan,
+[data-theme="forest-dark"] .msg-timeline .msg-content.bubble.mode-act {
+  background: var(--final-bubble);
+  border-color: var(--final-bubble-border);
 }
 
 /* ── modern scrollbars (all scroll containers, theme-aware) ── */
