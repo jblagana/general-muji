@@ -95,7 +95,11 @@ def _wait_port_free(port: int, host: str = "127.0.0.1", tries: int = 150, delay:
 
 if __name__ == "__main__":
     import uuid as _uuid
-    os.environ["MUJI_BOOT_TOKEN"] = _uuid.uuid4().hex
+    # A self-restart (POST /api/restart) spawns this file directly with NO
+    # env — so a fresh boot must mint its own per-boot token (the launcher
+    # path already sets one). The token is what /api/health reports, and
+    # what the UI compares against the parent's to confirm a NEW boot.
+    os.environ["MUJI_BOOT_TOKEN"] = os.environ.get("MUJI_BOOT_TOKEN") or _uuid.uuid4().hex
     port = _pick_port(settings.port)
     if port != settings.port:
         print(f"  port {settings.port} is taken by another program — using {port} instead")

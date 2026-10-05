@@ -285,8 +285,13 @@ async def api_restart():
             if f is not None:
                 f.close()
         out_log = err_log = subprocess.DEVNULL
+    # The child must NOT inherit the parent's MUJI_BOOT_TOKEN: a fresh boot
+    # has to mint its own so /api/health can distinguish "new server" from
+    # "the dying parent still answering" (the client's reload gate checks
+    # token != parent's). Popen inherits the full env by default, so strip it.
+    child_env = {k: v for k, v in os.environ.items() if k != "MUJI_BOOT_TOKEN"}
     spawn = dict(stdin=subprocess.DEVNULL, stdout=out_log, stderr=err_log,
-                 cwd=str(APP_ROOT))
+                 cwd=str(APP_ROOT), env=child_env)
     if os.name == "nt":
         spawn["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     else:
@@ -302,6 +307,12 @@ async def api_restart():
         (APP_ROOT / "data" / "stop.flag").unlink(missing_ok=True)
     except OSError:
         pass
+    # Durable audit line: log() is an in-memory ring that dies with this
+    # process, but the child's stdout IS data/server.log (opened above) —
+    # a flushed print survives and is greppable ("restart: parent ...").
+    parent_token = os.environ.get("MUJI_BOOT_TOKEN", "")
+    print(f"restart: parent boot_token={parent_token} exiting; "
+          f"child = {server_script}", flush=True)
     log("info", "restart: spawned fresh server.py, exiting this instance")
 
     def _exit_after_flush() -> None:
@@ -309,7 +320,13 @@ async def api_restart():
         os._exit(0)
 
     threading.Thread(target=_exit_after_flush, daemon=True).start()
-    return {"ok": True, "restarting": True}
+    # parent_boot_token lets the client verify a FRESH boot: the old code
+    # reloaded on the first 200 after the POST, but that 200 can come from
+    # the OLD process (still serving while it waits to exit) or a sibling
+    # checkout on the same port — so the page could come back stale. A fresh
+    # boot writes a new per-boot token; "token != parent" is the only real
+    # signal that a NEW server is answering (see restartServer in app.js).
+    return {"ok": True, "restarting": True, "parent_boot_token": parent_token}
 
 
 @app.middleware("http")

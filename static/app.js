@@ -7219,13 +7219,24 @@ el.rpTreeReveal.addEventListener("click", () => {
     if (!confirm("Restart the muji server? This reloads the latest code and stops any in-flight chat turn. The page reloads automatically once the server is back up.")) return;
     restarting = true;
     showRestartOverlay("Restarting server…");
-    try { await fetch("/api/restart", { method: "POST" }); }
-    catch (e) { /* the server exits before it can always reply — expected */ }
+    // parent_boot_token = the boot we just asked to die. The reload must wait
+    // for a FRESH boot_token, not the first 200: the old code reloaded on any
+    // live /api/sessions, which the DYING parent (still serving for ~0.5s) or
+    // a sibling checkout on the same port can answer — so the page could come
+    // back running the very code we just tried to replace.
+    let parentToken = null;
+    try {
+      const r = await fetch("/api/restart", { method: "POST" });
+      if (r.ok) parentToken = (await r.json()).parent_boot_token || null;
+    } catch (e) { /* the server exits before it can always reply — expected */ }
     const t0 = Date.now();
     const tick = async () => {
       try {
-        const r = await fetch("/api/sessions", { cache: "no-store" });
-        if (r.ok) { location.reload(); return; }
+        const r = await fetch("/api/health", { cache: "no-store" });
+        if (r.ok) {
+          const h = await r.json();
+          if (!parentToken || (h.boot_token && h.boot_token !== parentToken)) { location.reload(); return; }
+        }
       } catch (e) { /* still down */ }
       if (Date.now() - t0 > 30000) {
         showRestartOverlay("The server didn't come back within 30s. Reload the page to reconnect — or run python server.py again if it's not starting.", true);
