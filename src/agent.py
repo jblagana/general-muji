@@ -1605,12 +1605,19 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
             # (the notes file + recent messages carry the rest).
             if (settings.compact_enabled and turn > 1
                     and est_tokens(messages) >= settings.compact_trigger):
-                yield sse("status", {"text": "Context large — compacting…"})
+                # `compacting: true` is the machine-readable signal for the
+                # topbar context pill (the status text is human-only)
+                yield sse("status", {"text": "Context large — compacting…",
+                                     "compacting": True})
                 log("info", f"compacting context (~{est_tokens(messages)} est tokens)")
                 compacted = await _compact_context(messages, log, session_id)
                 if compacted:
                     messages = compacted
                     yield sse("status", {"text": f"Context compacted (~{est_tokens(messages)} est tokens)"})
+                    try:
+                        db.set_ctx_tokens(session_id, est_tokens(messages))
+                    except Exception:  # noqa: BLE001 — meter must never kill the turn
+                        pass
             # run-state checkpoint: a restart/crash mid-task can re-enter the
             # loop exactly here (saved AFTER compaction, so the persisted
             # conversation is the small one). One small write per turn.
@@ -1634,6 +1641,7 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
             think_t0 = len(thinking_text)  # per-round CoT metering (chars)
             finish_reason: str | None = None  # this round's end event
             usage_tokens = None  # completion_tokens from the final usage chunk
+            prompt_tokens = None  # prompt_tokens — the real context size
             # Per-round thinking (2026-09-28 experiment): first round of a
             # task = THINKING_FIRST (planning keeps the full dial), tool-
             # loop rounds = THINKING_LOOP; unset knobs fall back to THINKING
@@ -1707,6 +1715,7 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                         tool_calls[ev["index"]]["arguments"] += ev["arguments"]
                     elif ev["type"] == "usage":
                         usage_tokens = ev.get("completion_tokens")
+                        prompt_tokens = ev.get("prompt_tokens")
                     elif ev["type"] == "end":
                         # don't break: the usage chunk rides AFTER end
                         # (choices-less, post finish_reason) — keep draining
@@ -1743,10 +1752,28 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                 if span > 0:
                     tok_s = round(usage_tokens / span, 1)
             think_chars = len(thinking_text) - think_t0  # this round's CoT
+            # Context meter: the model's own prompt_tokens is the real size
+            # of what we sent (system + conversation + tool results).
+            # Persist it for the topbar pill + ride it on llm_end for the
+            # live update.
+            if prompt_tokens:
+                ctx_n = prompt_tokens
+            elif messages:
+                # est_tokens only covers the conversation — add the system
+                # prompt (it's most of a fresh chat's context)
+                ctx_n = est_tokens(messages) + (
+                    len(_content_text(messages[0].get("content"))) // 4)
+            else:
+                ctx_n = 0
+            try:
+                db.set_ctx_tokens(session_id, ctx_n)
+            except Exception:  # noqa: BLE001 — meter must never kill the turn
+                pass
             yield sse("llm_end", {"ms": llm_ms, "ttft_ms": ttft_ms,
                                   "tok_s": tok_s, "thinking_chars": think_chars,
                                   "thinking": round_thinking or None,
-                                  "completion_tokens": usage_tokens})
+                                  "completion_tokens": usage_tokens,
+                                  "prompt_tokens": prompt_tokens})
             log("tool", f"llm {llm_ms}ms ttft {ttft_ms}ms {usage_tokens}tok "
                         f"({think_chars} think chars, think="
                         f"{round_thinking or 'default'}) {tok_s}tok/s (turn {turn})")

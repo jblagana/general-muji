@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)" id="hljs-light"/>
   <link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark"/>
   <link rel="stylesheet" href="/static/vendor/katex.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=155"/>
+  <link rel="stylesheet" href="/static/style.css?v=156"/>
 </head>
 <body>
 <!-- Icon sprite (2026-10-05): one stroke family for the whole UI — Lucide-style
@@ -180,6 +180,14 @@
   <!-- Main -->
   <main class="main">
     <header class="topbar">
+      <!-- Context meter: fill of this chat's context vs the compaction
+           trigger. Data: sessions.ctx_tokens (persisted from the model's
+           prompt_tokens each round); live updates ride llm_end/status. -->
+      <span class="ctx-meter" id="ctx-meter" hidden>
+        <span class="ctx-bar"><i id="ctx-fill"></i></span>
+        <span class="ctx-pct" id="ctx-pct">0%</span>
+        <span class="ctx-tip"><b id="ctx-num">—</b> tokens<span class="sub" id="ctx-sub">auto-compacts at —</span></span>
+      </span>
       <button class="icon-btn" id="sidebar-open" title="Open sidebar" aria-label="Open sidebar" hidden>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
       </button>
@@ -463,6 +471,6 @@
 <script src="/static/vendor/purify.min.js"></script>
 <script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/katex.min.js"></script>
-<script src="/static/app.js?v=178"></script>
+<script src="/static/app.js?v=179"></script>
 </body>
 </html>

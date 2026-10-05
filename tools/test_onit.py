@@ -358,6 +358,18 @@ _m = re.search(r'"thinking_chars": (\d+)', _llm_end[0])
 _think_ch = int(_m.group(1)) if _m else None
 check("llm_end carries thinking_chars (per-round CoT delta)",
       _think_ch == 4, str(_think_ch))  # mock yields exactly 4 thinking chars
+# Context meter: llm_end carries the model's own prompt_tokens (the real
+# context size) and the agent persists it on the session row for the
+# topbar pill (reload-proof).
+_m = re.search(r'"prompt_tokens": (\d+)', _llm_end[0])
+_pt = int(_m.group(1)) if _m else None
+check("llm_end carries prompt_tokens (context meter)", _pt == 10, str(_pt))
+check("ctx_tokens persisted on the session row",
+      db.get_session(sid)["ctx_tokens"] == 10,
+      str(db.get_session(sid).get("ctx_tokens")))
+check("list_sessions carries ctx_tokens",
+      any(s["id"] == sid and s["ctx_tokens"] == 10
+          for s in db.list_sessions()))
 
 print("── 5b. per-round thinking knobs (THINKING_FIRST / THINKING_LOOP) ──")
 # 2026-09-28 experiment plumbing: round 1 of a task (planning) gets

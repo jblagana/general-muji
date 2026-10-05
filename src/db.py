@@ -306,6 +306,14 @@ def _db() -> sqlite3.Connection:
             _conn.commit()
         except sqlite3.OperationalError:
             pass
+        # migration: pre-context-meter DBs have no per-chat context token
+        # count — the topbar pill shows fill vs the compaction trigger
+        try:
+            _conn.execute(
+                "ALTER TABLE sessions ADD COLUMN ctx_tokens INTEGER")
+            _conn.commit()
+        except sqlite3.OperationalError:
+            pass
     return _conn
 
 
@@ -394,6 +402,18 @@ def get_session(sid: str) -> dict | None:
     with _lock:
         r = _db().execute("SELECT * FROM sessions WHERE id=?", (sid,)).fetchone()
     return _row(r)
+
+
+def set_ctx_tokens(sid: str, n: int | None) -> None:
+    """Persist the chat's last known context size (prompt tokens from the
+    model's usage chunk, or the agent's estimate). The topbar context pill
+    reads it on session load; None clears it (fresh chat)."""
+    if not sid:
+        return
+    with _lock:
+        _db().execute("UPDATE sessions SET ctx_tokens=? WHERE id=?",
+                      (n, sid))
+        _db().commit()
 
 
 def create_session(workspace_id: str | None = None) -> dict:

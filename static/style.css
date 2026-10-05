@@ -1114,6 +1114,47 @@ body.resizing-h iframe { pointer-events: none; }
 }
 .topbar-actions { display: flex; gap: 2px; }
 
+/* ── context meter (topbar, far left): fill of this chat's context vs the
+     compaction trigger. Green → amber ≥60% → red ≥85%; dimmed "compacting…"
+     while the compaction step runs. Tooltip on hover: exact tokens. ── */
+.ctx-meter {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  /* `display: inline-flex` would override the `hidden` attribute —
+     keep the UA display:none winning when the chat has no data yet */
+}
+.ctx-meter[hidden] { display: none; }
+.ctx-meter:not([hidden]) {
+  height: 22px; padding: 0 8px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--panel-2); color: var(--muted);
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  position: relative; white-space: nowrap;
+}
+.ctx-bar {
+  width: 44px; height: 4px; border-radius: 2px; overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+}
+.ctx-bar i {
+  display: block; height: 100%; border-radius: 2px;
+  background: var(--ok); transition: width .3s, background .3s;
+}
+.ctx-meter.warn { color: var(--warn); }
+.ctx-meter.warn .ctx-bar i { background: var(--warn); }
+.ctx-meter.hot { color: var(--err); }
+.ctx-meter.hot .ctx-bar i { background: var(--err); }
+.ctx-meter.compacting { opacity: .6; }
+.ctx-meter.compacting .ctx-pct { color: var(--accent); }
+.ctx-tip {
+  display: none; position: absolute; top: calc(100% + 7px); left: 0;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; font-size: 11px;
+  color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  white-space: nowrap; z-index: 5;
+}
+.ctx-tip b { font-variant-numeric: tabular-nums; }
+.ctx-tip .sub { color: var(--muted); display: block; margin-top: 2px; }
+.ctx-meter:hover .ctx-tip { display: block; }
+
 /* ── collapsed chat: main area hides, a slim strip takes its place ── */
 .app.chat-collapsed .main { display: none; }
 .chat-strip {

@@ -130,6 +130,8 @@
     tzTab: $("tz-tab"), tzClose: $("tz-close"),
     sessionList: $("session-list"), rootLine: $("root-line"), modelLine: $("model-line"), restartServer: $("restart-server"),
     topbarTitle: $("topbar-title"), previewToggle: $("preview-toggle"),
+    ctxMeter: $("ctx-meter"), ctxFill: $("ctx-fill"), ctxPct: $("ctx-pct"),
+    ctxNum: $("ctx-num"), ctxSub: $("ctx-sub"),
     chatCollapse: $("chat-collapse"), chatStrip: $("chat-strip"),
     chatStripLabel: $("chat-strip-label"), chatStripDot: $("chat-strip-dot"),
     themeToggle: $("theme-toggle"), modeToggle: $("mode-toggle"), roastToggle: $("roast-toggle"),
@@ -2677,6 +2679,8 @@
     updateBanner();
     attentionForWaiting();
     updateMenuCounts();
+    ctxMeterFromSession(true);  // 3 s poll: refresh the meter, keep an
+                                // in-flight compacting flag from flickering
     if (sig === state.sessionSig) return;
     state.sessionSig = sig;
     el.sessionList.classList.toggle("archived-collapsed", state.archiveCollapsed);
@@ -2878,6 +2882,7 @@
     queueSessionToast(sid);  // pill fires at loadHistory's settle, post-render
     pickUI();  // 📂 shows for chats without a chosen working folder
     focusComposer();
+    ctxMeterFromSession();  // topbar meter follows the chat (or hides)
     // Mobile: picking a chat is the whole point — don't leave the
     // overlay sidebar covering the conversation. Only for a real row
     // tap (fromSidebar); the boot-time restore keeps it expanded.
@@ -2899,6 +2904,7 @@
     state.treeSid = null;   // force the Files tab to resync to the (new) chat
     renderTerminal();
     renderSessionTitle();
+    ctxMeterFromSession();  // no chat open → meter hides
     if (state.rightTab === "files") { syncTreeToChat(); syncHiddenToggle(); }
     updateResumeChip(false);
     if (state.rightTab === "thinking") renderThinkingPanel();
@@ -2919,6 +2925,7 @@
     refreshSessions();
     pickUI();  // 📂 shows for the fresh chat
     focusComposer();
+    ctxMeterFromSession();  // fresh chat → no data yet → meter hides
   }
 
   async function addWorkspace() {
@@ -3340,6 +3347,24 @@
         } else {
           if (turn) thinkLabel(turn, d.text || "Working…");
           progressPhase(d.text || "Working…");
+          // context meter: the compaction step flags its start
+          // (`compacting: true`); any other status frame clears the flag
+          if (d.compacting) {
+            const s = state.sessions.find((x) => x.id === sid);
+            renderCtxMeter((s && s.ctx_tokens) || state.ctxToks, true);
+          } else if (el.ctxMeter.classList.contains("compacting")) {
+            ctxMeterFromSession();
+          }
+        }
+        break;
+      case "llm_end":
+        // context meter: the model's own prompt_tokens for THIS call is
+        // the real context size — update the topbar pill live (the value
+        // is also persisted server-side, so a reload shows it too)
+        if (d.prompt_tokens) {
+          const s = state.sessions.find((x) => x.id === sid);
+          if (s) s.ctx_tokens = d.prompt_tokens;
+          renderCtxMeter(d.prompt_tokens, false);
         }
         break;
       case "plan":
@@ -3411,6 +3436,7 @@
       case "done":
         v.done = true;
         v.knownActive = false;
+        ctxMeterReset();  // run ended — clear any stuck compacting flag
         if (turn && !turn.finished) {
           finishTurn(turn, d.content, d.files, sid);
           // ended with NO final answer (empty content, no files) — treat it
@@ -3475,6 +3501,7 @@
       case "stopped":
         v.done = true;
         v.knownActive = false;
+        ctxMeterReset();  // run ended — clear any stuck compacting flag
         if (turn && !turn.finished) {
           const note = document.createElement("div");
           note.className = "msg-stopped";
@@ -5004,6 +5031,48 @@
       s && s.pinned ? icon("pin") : null,
       document.createTextNode((s && s.pinned ? " " : "") + name));
     el.rpSessionTitle.title = name;
+  }
+
+  // ── Context meter (topbar, far left) ─────────────────────────
+  // Fill of this chat's context vs the compaction trigger. `toks` is the
+  // chat's last known context size (the model's prompt_tokens, persisted on
+  // sessions.ctx_tokens). Hidden for a fresh chat (no data yet). The
+  // compacting flag dims it + swaps the % for a label while the compaction
+  // step runs (server's status frame carries `compacting: true`).
+  function renderCtxMeter(toks, compacting) {
+    const trig = (state.config && state.config.compact_trigger) || 0;
+    if (toks) state.ctxToks = toks;  // remember for the compacting flip
+    if (!trig || !toks || toks <= 0) {
+      el.ctxMeter.hidden = true;
+      return;
+    }
+    const pct = Math.min(100, Math.round((toks / trig) * 100));
+    el.ctxMeter.hidden = false;
+    el.ctxMeter.classList.toggle("warn", !compacting && pct >= 60 && pct < 85);
+    el.ctxMeter.classList.toggle("hot", !compacting && pct >= 85);
+    el.ctxMeter.classList.toggle("compacting", !!compacting);
+    el.ctxFill.style.width = pct + "%";
+    el.ctxPct.textContent = compacting ? "compacting…" : pct + "%";
+    const fmt = (n) => (n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n));
+    el.ctxNum.textContent = fmt(toks) + " / " + fmt(trig);
+    el.ctxSub.textContent = compacting ? "summarizing now"
+      : "auto-compacts at " + fmt(trig);
+  }
+  // Feed the meter from the current session row (session switch / refresh).
+  // A session row never knows about in-flight compaction, so by default
+  // this CLEARS the flag — a live compacting status frame re-sets it.
+  // keepCompacting (the 3 s sidebar poll) preserves an in-flight flag:
+  // the poll must not flicker the meter back to normal mid-compaction.
+  function ctxMeterFromSession(keepCompacting) {
+    const s = state.sessionId
+      ? state.sessions.find((x) => x.id === state.sessionId) : null;
+    renderCtxMeter(s && s.ctx_tokens,
+                   keepCompacting && el.ctxMeter.classList.contains("compacting"));
+  }
+  // End-of-run reset: done/stopped clear the compacting flag (a run that
+  // died mid-compaction leaves it stuck otherwise).
+  function ctxMeterReset() {
+    if (el.ctxMeter.classList.contains("compacting")) ctxMeterFromSession();
   }
 
   function resetTree() {
