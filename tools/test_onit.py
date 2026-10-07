@@ -253,7 +253,8 @@ print("── 4. schema sanity (public build: personal tools opt-in) ───�
 # no module reload, which would desync the agent's held references.)
 _default_disabled = config.settings.tools_disabled
 schemas = {s["function"]["name"] for s in tools.openai_schemas()}
-check("core tools advertised by default", len(schemas) == 13, str(len(schemas)))
+check("core tools advertised by default", len(schemas) == 14, str(len(schemas)))
+check("search_transcript present (transcript recall)", "search_transcript" in schemas)
 check("verify_math present (sympy TA-checker)", "verify_math" in schemas)
 check("personal tools OFF by default (opt-in)",
       not ({"tg_search", "tg_read", "gmail_search", "gmail_read",
@@ -261,10 +262,10 @@ check("personal tools OFF by default (opt-in)",
 check("removed spill-wrapper tools absent", not ({"result_read", "result_grep"} & schemas))
 check("IMAP email tools absent",
       not ({"email_list", "email_read", "email_search", "email_folders"} & schemas))
-# Opt-IN: an empty disabled set re-enables every tool (23 total).
+# Opt-IN: an empty disabled set re-enables every tool (24 total).
 config.settings.tools_disabled = frozenset()
 schemas_on = {s["function"]["name"] for s in tools.openai_schemas()}
-check("opt-in (disabled=∅) enables all 23 tools", len(schemas_on) == 23, str(len(schemas_on)))
+check("opt-in (disabled=∅) enables all 24 tools", len(schemas_on) == 24, str(len(schemas_on)))
 check("personal tools present when opted in",
       {"tg_search", "tg_read", "gmail_search", "gmail_read",
        "tasks_list", "tasks_add", "tasks_done",
@@ -1383,6 +1384,27 @@ check("trim is a copy — DB rows stay intact",
           if m["role"] == "assistant"))
 check("agent recall callers unaffected (no thinking_tail arg)",
       len(db.list_messages(sid12, limit=6)) == 6)
+
+print("── 13. search_transcript (recall beyond the 16-message window) ──")
+sid13 = db.create_session()["id"]
+db.rename_session(sid13, "recall-test-chat")
+for i in range(20):  # 20 msgs → the first half is OUTSIDE the 16-msg window
+    db.add_message(sid13, "user" if i % 2 == 0 else "assistant",
+                   f"message number {i} — filler")
+db.add_message(sid13, "user", "the secret codeword was ZEBRA-42")
+ctx13 = tools.ToolCtx(cwd=pathlib.Path("."), session_id=sid13)
+res13 = tools.t_search_transcript(ctx13, query="ZEBRA-42")
+check("finds a message outside the 16-msg window", "ZEBRA-42" in res13)
+check("labels the speaker", "· You]" in res13)
+res13b = tools.t_search_transcript(ctx13, query="no-such-needle")
+check("no-match says so (no confabulation)", "no messages" in res13b)
+res13c = tools.t_search_transcript(ctx13, query="", chat="recall-test-chat")
+check("empty query by chat title = recent messages", "message number" in res13c)
+try:
+    tools.t_search_transcript(ctx13, query="ZEBRA-42", chat="no-such-chat")
+    check("unknown chat raises ToolError", False)
+except tools.ToolError:
+    check("unknown chat raises ToolError", True)
 
 print()
 if FAILURES:

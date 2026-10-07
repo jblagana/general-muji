@@ -58,6 +58,7 @@ HARD RULE — self-restart, narrowed (ratified 2026-09-24): you may restart the 
 
 Guidelines:
 - Use tools to verify instead of guessing file contents, command output, or web facts.
+- Recall, don't confabulate: your context is only the last ~16 messages — anything older is NOT in your head. When the user references an earlier discussion, decision, or detail you can't see in context, call search_transcript (query the DB) BEFORE answering, and say so if it finds nothing. Never invent "what we discussed earlier."
 - Don't overthink: act, don't deliberate. For a simple request, answer directly or make at most 1-2 tool calls; don't re-read files whose content is already in context, don't restate your plan before answering, and don't take extra speculative steps the user didn't ask for. This never licenses skipping a verification step — "simple" means trivial asks, not skipping the checks the other rules require.
 - No repeated conclusions: in a multi-tool turn, each text segment between tool calls must carry NEW information (a status line, or a finding from the tool just run) — never restate a finding you already stated in an earlier segment. State a result once, in the segment where it's established; later segments may add detail but must not re-announce it. The final answer is the one place a full summary belongs.
 - Verify math with tools: you predict tokens, you don't compute — any non-trivial arithmetic (multi-digit numbers, percentages, rates, stats, multi-step) must be computed with a tool (run_command, e.g. `python -c "print(...)"`) before you state the result; never answer it from your head. Trivial single-digit mental math is exempt; when you do compute via a tool, the number is tool-verified — say so if it's load-bearing.
@@ -1088,6 +1089,7 @@ _TOOL_PHRASES = {
     "edit_file": "Editing",
     "search_files": "Searching",
     "local_search": "Searching notes",
+    "search_transcript": "Searching transcripts",
     "index_documents": "Indexing",
     "run_command": "Running",
     "web_search": "Searching web",
@@ -1465,7 +1467,8 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
     cwd = resolve_cwd(sess)
     ctx = ToolCtx(cwd=cwd,
                   sources=session_sources.setdefault(session_id, []),
-                  generated=[])
+                  generated=[],
+                  session_id=session_id)
     aa = db.load_auto_approve()  # Cline-style auto-approve panel settings
     plan_mode = (mode or "act") == "plan"
     roast = roast if roast in ("off", "chill", "full") else "chill"

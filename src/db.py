@@ -940,6 +940,34 @@ def list_messages(sid: str, limit: int = 200,
     return out
 
 
+def search_messages(query: str, sid: str | None = None,
+                    limit: int = 8, scan: int = 400) -> list[dict]:
+    """Keyword search over finished message contents (search_transcript
+    recall tool, 2026-10-07). `sid` = one session, None = all sessions;
+    `scan` caps how many newest rows per session are searched (the DB
+    keeps everything, but a full-table scan per recall is wasteful);
+    returns the newest `limit` matches, oldest → newest."""
+    q = (query or "").strip()
+    if not q:
+        return []
+    like = f"%{q}%"
+    sids = ([sid] if sid else [r["id"] for r in
+            _db().execute("SELECT id FROM sessions ORDER BY updated_at DESC")
+            .fetchall()])
+    found: list[dict] = []
+    with _lock:
+        for s in sids:
+            rows = _db().execute(
+                "SELECT * FROM (SELECT * FROM messages WHERE session_id=? "
+                "AND draft=0 ORDER BY id DESC LIMIT ?) WHERE content LIKE ? "
+                "ORDER BY id", (s, scan, like)).fetchall()
+            found.extend(dict(r) for r in rows)
+    out = sorted(found, key=lambda m: m["id"])[-max(1, limit):]
+    for m in out:
+        m.pop("ui", None)
+    return out
+
+
 def count_messages_before(sid: str, before_id: int) -> int:
     """Finished messages strictly OLDER than the cursor — the "N hidden"
     number behind the Load earlier button (windowed /api/history,

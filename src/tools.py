@@ -51,6 +51,7 @@ class ToolCtx:
     sources: list = dataclasses.field(default_factory=list)    # grounding text
     generated: list = dataclasses.field(default_factory=list)  # files written
     scope_approved: set = dataclasses.field(default_factory=set)  # gated-scope paths (self/outside) granted this run
+    session_id: str = ""  # this run's chat — lets tools address "the current conversation" (search_transcript)
 
 
 # ── path safety ─────────────────────────────────────────────────────
@@ -1107,6 +1108,56 @@ def t_local_search(ctx: ToolCtx, query: str, top_k: int = 6,
     return "\n".join(out)
 
 
+def t_search_transcript(ctx: ToolCtx, query: str = "", chat: str = "",
+                        limit: int = 8) -> str:
+    """Search the boss's chat transcripts (the DB, NOT the 16-message
+    context window) — the recall path for anything older than the window.
+    `query` = words to find (empty = recent messages); `chat` = session
+    title or id prefix to restrict to one conversation (empty = all)."""
+    from . import db
+    lim = max(1, min(int(limit or 8), 20))
+    q = (query or "").strip()
+    # resolve `chat` → session id
+    sid = ""
+    if chat.strip():
+        c = chat.strip()
+        if len(c) >= 8 and c.lower() in {s["id"].lower() for s in db.list_sessions()}:
+            sid = next(s["id"] for s in db.list_sessions()
+                       if s["id"].lower() == c.lower())
+        else:
+            cands = [s for s in db.list_sessions()
+                     if c.lower() in (s.get("title") or "").lower()
+                     or (s["id"] or "").lower().startswith(c.lower())]
+            if len(cands) == 1:
+                sid = cands[0]["id"]
+            elif len(cands) > 1:
+                names = ", ".join(f"{s.get('title') or s['id'][:8]}" for s in cands[:5])
+                raise ToolError(f"chat {chat!r} is ambiguous — matches: {names}")
+            else:
+                raise ToolError(f"no chat matches {chat!r}")
+    if q:
+        rows = db.search_messages(q, sid or ctx.session_id or None, limit=lim)
+    else:
+        if sid or ctx.session_id:
+            rows = db.list_messages(sid or ctx.session_id, limit=lim)
+        else:  # all chats: newest `lim` across every session
+            pool = [m for s in db.list_sessions()
+                    for m in db.list_messages(s["id"], limit=lim)]
+            rows = sorted(pool, key=lambda m: m["id"])[-lim:]
+    if not rows:
+        scope = "this chat" if (sid or ctx.session_id) else "all chats"
+        what = f" for {q!r}" if q else ""
+        return (f"search_transcript: no messages{what} in {scope} "
+                f"(widen with limit, different words, or chat=…)")
+    out = [f"search_transcript: {len(rows)} message(s) (newest last)"]
+    for m in rows:
+        who = "You" if m["role"] == "user" else "muji"
+        body = re.sub(r"\s+", " ", (m.get("content") or "")).strip()
+        body = body[:1200] + ("…" if len(body) > 1200 else "")
+        out.append(f"\n[{m['id']} · {who}] {body}")
+    return "\n".join(out)
+
+
 def t_index_documents(ctx: ToolCtx, paths: str | None = None,
                       rebuild: bool = False, status_only: bool = False) -> str:
     from . import rag
@@ -1495,6 +1546,22 @@ TOOLS = [
         "required": ["query"],
     },
     {
+        "name": "search_transcript", "fn": t_search_transcript,
+        "description": ("Search chat transcripts in the DB — the recall path "
+                        "for anything OLDER than the ~16-message context "
+                        "window (or after compaction). `query` = words to find "
+                        "(empty = recent messages); `chat` = chat title or id "
+                        "to restrict to one conversation (default: this chat; "
+                        "empty query with no chat = most recent across chats). "
+                        "Use it whenever the boss references an earlier "
+                        "discussion you don't have in context — don't guess."),
+        "params": {
+            "query": {"type": "string", "description": "Words to find (empty = recent messages)"},
+            "chat": {"type": "string", "description": "Chat title or id prefix (default: this chat)"},
+            "limit": {"type": "integer", "description": "Max messages (default 8, cap 20)"},
+        },
+    },
+    {
         "name": "index_documents", "fn": t_index_documents,
         "description": ("Build/refresh the local RAG index over your documents "
                         "(md, txt, py, js, ipynb, tex, …). Incremental by default; "
@@ -1714,7 +1781,7 @@ TOOLS = [
 #: category → tools it covers; label shown on approval cards / UI.
 APPROVAL_CATEGORIES: dict[str, set[str]] = {
     "read": {"list_dir", "read_file", "search_files",
-             "local_search", "index_documents",
+             "local_search", "search_transcript", "index_documents",
              "gmail_search", "gmail_read",
              "verify_math",
              "tasks_list",
