@@ -158,6 +158,7 @@
     latOpen: $("lat-open"), latDrawer: $("lat-drawer"), latDim: $("lat-dim"),
     latClose: $("lat-close"), latSub: $("lat-sub"),
     latBtnTok: $("lat-btn-tok"), latBtnMs: $("lat-btn-ms"),
+    latToggle: $("lat-toggle"),
     latGrid: $("lat-grid"), latLegend: $("lat-legend"),
     latVerdict: $("lat-verdict"), latNote: $("lat-note"),
     rightPanel: $("right-panel"), rpClose: $("rp-close"),
@@ -6944,9 +6945,128 @@
     const c = stops[i].map((v, k) => Math.round(v + (stops[i + 1][k] - v) * f));
     return `rgb(${c[0]},${c[1]},${c[2]})`;
   }
+
+  function latRenderDay() {
+    const D = latData;
+    const now = new Date();
+    const nowH = now.getHours();
+    // LOCAL date — the data is bucketed in local time (the UTC bucketing
+    // was the original heatmap bug). toISOString() would be UTC.
+    const todayStr = now.getFullYear() + "-" +
+      String(now.getMonth() + 1).padStart(2, "0") + "-" +
+      String(now.getDate()).padStart(2, "0");
+    const recent = D.days.slice(-14);
+    const proj = [], projN = [];
+    for (let h = 0; h < 24; h++) {
+      const vals = [];
+      for (const d of recent) {
+        const v = D.tok_s[d][h];
+        const n = D.n_tok[d][String(h)] || 0;
+        if (v != null && n) { for (let i = 0; i < n; i++) vals.push(v); }
+      }
+      projN[h] = vals.length;
+      proj[h] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    }
+    const today = D.days.includes(todayStr) ? D.days.indexOf(todayStr) : -1;
+    const grid = el.latGrid;
+    grid.innerHTML = "";
+    grid.classList.add("daychart");
+    grid.style.gridTemplateColumns = `repeat(24, 1fr)`;
+    const todayArr = today >= 0 ? D.tok_s[todayStr] : null;  // keyed by date string
+    const all = [];
+    for (let h = 0; h < 24; h++) {
+      const v = todayArr ? todayArr[h] : null;
+      const p = proj[h];
+      if (v != null) all.push(v);
+      if (p != null) all.push(p);
+    }
+    if (!all.length) {
+      grid.classList.remove("daychart");
+      el.latVerdict.textContent = "No tok/s data yet — use muji a bit and come back.";
+      return;
+    }
+    const lo = Math.min(...all), hi = Math.max(...all);
+    const span = hi - lo || 1;
+    const pAll = proj.filter(v => v != null);
+    const dayMed = pAll.length ? pAll.reduce((a, b) => a + b, 0) / pAll.length : null;
+    for (let h = 0; h < 24; h++) {
+      const col = document.createElement("div");
+      col.className = "dcol" + (h === nowH ? " now" : "");
+      const track = document.createElement("div");
+      track.className = "dtrack";
+      const v = todayArr ? todayArr[h] : null;
+      const p = proj[h];
+      const shown = v != null ? v : p;
+      const bar = document.createElement("div");
+      bar.className = "dbar" + (v != null ? " actual" : (p == null ? " na" : " proj"));
+      if (shown != null) {
+        bar.style.height = Math.max(6, ((shown - lo) / span) * 100) + "%";
+        bar.style.background = latColor((shown - lo) / span);
+        bar.title = latFmtHour(h) + (v != null ? "" : " (projected)");
+      } else {
+        bar.style.height = "6%";
+        bar.title = latFmtHour(h) + " — no history";
+      }
+      track.appendChild(bar);
+      if (dayMed != null) {
+        const base = document.createElement("div");
+        base.className = "dbase";
+        base.style.bottom = Math.max(0, Math.min(100, ((dayMed - lo) / span) * 100)) + "%";
+        track.appendChild(base);
+      }
+      col.appendChild(track);
+      const lbl = document.createElement("div");
+      lbl.className = "dlab";
+      lbl.textContent = h % 3 === 0 ? latFmtHour(h) : "";
+      col.appendChild(lbl);
+      grid.appendChild(col);
+    }
+    const lg = el.latLegend;
+    lg.innerHTML = "";
+    const l1 = document.createElement("span");
+    l1.textContent = lo.toFixed(0) + " tok/s";
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    const l2 = document.createElement("span");
+    l2.textContent = hi.toFixed(0) + " tok/s";
+    lg.append(l1, bar, l2);
+    const nActual = todayArr ? todayArr.filter(v => v != null).length : 0;
+    el.latSub.textContent =
+      `${D.days.length} days · ${recent.length}-day projection · ${nActual}/24 hours actual today`;
+    // Verdict: work now or later?
+    const pNow = proj[nowH];
+    const rank = pAll.slice().sort((a, b) => a - b);
+    const pctile = pNow != null && rank.length
+      ? Math.round((rank.filter(x => x < pNow).length / rank.length) * 100) : null;
+    let verdict;
+    if (pNow == null) {
+      verdict = `No history for ${latFmtHour(nowH)} — can't project this hour. ` +
+        `Best window so far: see the greenest bars below.`;
+    } else if (dayMed != null && pNow >= dayMed * 0.97) {
+      verdict = `Now is <b>good</b> — ${latFmtHour(nowH)} projects <b>${pNow.toFixed(0)} tok/s</b>` +
+        (pctile != null ? ` (top ${100 - pctile}% of the day)` : "") +
+        `, at/above the day median of ${dayMed.toFixed(0)}. Work now.`;
+    } else {
+      let bestH = -1, bestV = -1;
+      for (let h = 0; h < 24; h++)
+        if (proj[h] != null && proj[h] > bestV) { bestV = proj[h]; bestH = h; }
+      const diff = dayMed != null ? Math.round((1 - pNow / dayMed) * 100) : null;
+      verdict = `Now is <b>slow</b> — ${latFmtHour(nowH)} projects <b>${pNow.toFixed(0)} tok/s</b>` +
+        (diff != null ? ` (${diff}% under the day median)` : "") +
+        `. Best window: <b>${latFmtHour(bestH)} — ${bestV.toFixed(0)} tok/s</b>.`;
+    }
+    el.latVerdict.innerHTML = verdict;
+    el.latNote.textContent =
+      "Solid bars = today's actual medians so far. Faded bars = projection " +
+      "(14-day weighted median per hour). Dashed line = projected day median. " +
+      "Gray stub = no history that hour. Projection is a historical average, " +
+      "not a guarantee — a heavy load right now can still slow things down.";
+  }
   function latRender() {
     if (!latData) return;
     const D = latData;
+    el.latGrid.classList.remove("daychart");
+    if (latMetric === "day") { latRenderDay(); return; }
     const order = [...D.hours.slice(LAT_START_H), ...D.hours.slice(0, LAT_START_H)];
     const grid = el.latGrid;
     grid.innerHTML = "";
@@ -7066,17 +7186,15 @@
         ev.target !== el.latOpen)
       closeLatDrawer();
   });
-  el.latBtnTok.addEventListener("click", () => {
-    latMetric = "tok_s";
-    el.latBtnTok.classList.add("active");
-    el.latBtnMs.classList.remove("active");
-    latRender();
-  });
-  el.latBtnMs.addEventListener("click", () => {
-    latMetric = "ms";
-    el.latBtnMs.classList.add("active");
-    el.latBtnTok.classList.remove("active");
-    latRender();
+  // Tab buttons: data-metric drives latMetric; "day" is the 12am-11:59pm
+  // projection view (latRenderDay).
+  el.latToggle.querySelectorAll("button").forEach((b) => {
+    b.addEventListener("click", () => {
+      latMetric = b.dataset.metric;
+      el.latToggle.querySelectorAll("button").forEach((x) =>
+        x.classList.toggle("active", x === b));
+      latRender();
+    });
   });
   // chat search/filter — client-side, filters title + summary
   el.chatSearch.addEventListener("input", () => {

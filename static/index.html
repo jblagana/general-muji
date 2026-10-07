@@ -451,8 +451,9 @@
     </div>
     <div class="lat-body" id="lat-body">
       <div class="lat-toggle" id="lat-toggle">
-        <button id="lat-btn-tok" class="active">tok/s (fast = green)</button>
-        <button id="lat-btn-ms">round time (slow = red)</button>
+        <button id="lat-btn-tok" class="active" data-metric="tok_s">tok/s (fast = green)</button>
+        <button id="lat-btn-ms" data-metric="ms">round time (slow = red)</button>
+        <button id="lat-btn-day" data-metric="day">today + projection (work now?)</button>
       </div>
       <div class="lat-scroll">
         <div class="lat-grid" id="lat-grid"></div>

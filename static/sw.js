@@ -1,4 +1,4 @@
-/* muji service worker — v34 (network-first shell; cache-first static; self-updating) */
+/* muji service worker — v35 (network-first shell; cache-first static; self-updating) */
 const CACHE = "muji-v111";
 const SHELL = [
   "/",

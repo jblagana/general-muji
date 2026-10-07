@@ -2343,6 +2343,30 @@ span.link-broken { color: var(--muted); text-decoration: line-through; cursor: h
   font-weight: 500; color: rgba(255,255,255,.55);
 }
 .lat-grid .cell.na .n { color: var(--muted); }
+/* "Today + projection" tab: 24 vertical bars (12am-11:59pm). Solid =
+   today's actual medians so far, faded = 14-day projection per hour,
+   dashed line = projected day median, outlined column = right now. */
+.lat-grid.daychart { grid-template-columns: repeat(24, 1fr); min-width: 560px; }
+.lat-grid.daychart .dcol { display: flex; flex-direction: column; min-width: 0; }
+.lat-grid.daychart .dtrack {
+  position: relative; flex: none; height: 150px;
+  border-bottom: 1px solid var(--border);
+}
+.lat-grid.daychart .dcol.now .dtrack { outline: 1px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
+.lat-grid.daychart .dbar {
+  position: absolute; bottom: 0; left: 2px; right: 2px;
+  border-radius: 3px 3px 0 0; min-height: 2px;
+}
+.lat-grid.daychart .dbar.proj { opacity: .45; }
+.lat-grid.daychart .dbar.na { background: var(--panel-2); height: 6px !important; }
+.lat-grid.daychart .dbase {
+  position: absolute; left: 0; right: 0; height: 0;
+  border-top: 1px dashed var(--muted); opacity: .5; pointer-events: none;
+}
+.lat-grid.daychart .dlab {
+  font-size: 8.5px; color: var(--muted); text-align: center;
+  padding-top: 3px; white-space: nowrap;
+}
 .lat-legend { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 11px; color: var(--muted); }
 .lat-legend .bar {
   flex: 0 0 180px; height: 9px; border-radius: 4px;
