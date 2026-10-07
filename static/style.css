@@ -1215,27 +1215,6 @@ body.resizing-h iframe { pointer-events: none; }
 .toks.r { color: var(--err); }  .toks.r .dot { background: var(--err); }
 .toks.stale { opacity: .4; }
 
-/* ── collapsed chat: main area hides, a slim strip takes its place ── */
-.app.chat-collapsed .main { display: none; }
-.chat-strip {
-  flex: 1; display: flex; align-items: center; gap: 10px;
-  margin: 0; padding: 0 18px; border: none; background: var(--panel);
-  color: var(--text); font: inherit; cursor: pointer; min-width: 0;
-}
-.chat-strip:hover { background: var(--panel-2); }
-.chat-strip svg { flex: none; opacity: .6; }
-.chat-strip-label {
-  font-size: 13px; font-weight: 600; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap;
-}
-.chat-strip-dot {
-  flex: none; width: 8px; height: 8px; border-radius: 50%;
-  background: var(--accent); animation: pulse 0.8s infinite;
-}
-.chat-strip-hint {
-  flex: none; margin-left: auto; font-size: 12px; color: var(--muted);
-}
-
 /* ── watch strip (the supervisor) ───────────────────────────────────
    Thin always-on herd view: one line when healthy, amber/red pulse when
    something's stuck or waiting. Click the strip → the board expands

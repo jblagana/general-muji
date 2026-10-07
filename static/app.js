@@ -134,8 +134,6 @@
     toks: $("toks"), toksVal: $("toks-val"),
     tbMenuBtn: $("tb-menu-btn"), tbMenu: $("tb-menu"),
     ctxNum: $("ctx-num"), ctxSub: $("ctx-sub"),
-    chatCollapse: $("chat-collapse"), chatStrip: $("chat-strip"),
-    chatStripLabel: $("chat-strip-label"), chatStripDot: $("chat-strip-dot"),
     themeToggle: $("theme-toggle"), modeToggle: $("mode-toggle"), roastToggle: $("roast-toggle"),
     progress: $("progress"), progressFill: $("progress-fill"), progressLabel: $("progress-label"),
     progressSteps: $("progress-steps"),
@@ -1204,7 +1202,6 @@
       el.jobStrip.hidden = true;
       el.jobText.textContent = "";
     }
-    chatStripText();  // the collapsed strip mirrors the pinned goal
   }
 
   // Settle the strip: keep the last goal visible, stop the pulse. `checked`
@@ -3627,7 +3624,6 @@
     state.processing = flag;
     el.sendBtn.hidden = flag;
     el.stopBtn.hidden = !flag;
-    chatStripText();  // the collapsed strip's live dot follows the run state
   }
 
   function finishTurn(turn, content, files, sid) {
@@ -4672,21 +4668,6 @@
       el.sidebarOpen.hidden = false;
     }
   });
-
-  // Collapsed chat: the whole main area (topbar + messages + composer)
-  // hides and a slim strip takes its place — same pattern as the side
-  // panels. The strip shows the pinned job goal (or "muji") and a pulsing
-  // dot while a run is in flight, so a collapsed chat still signals life.
-  function setChatCollapsed(collapsed) {
-    document.querySelector(".app").classList.toggle("chat-collapsed", collapsed);
-    el.chatStrip.hidden = !collapsed;
-    if (!collapsed) focusComposer();
-  }
-  function chatStripText() {
-    const t = el.jobText.textContent.trim();
-    el.chatStripLabel.textContent = (t && !el.jobStrip.hidden) ? t : "muji";
-    el.chatStripDot.hidden = !state.processing;
-  }
 
   // ── Right panel: per-chat state ─────────────────────────────────
   // The Terminal tab is DB-backed: GET /api/sessions/{sid}/tool_log is the
@@ -7310,8 +7291,6 @@ el.rpTreeReveal.addEventListener("click", () => {
     el.sidebarOpen.hidden = true;
     updatePanelOverlay();
   });
-  el.chatCollapse.addEventListener("click", () => setChatCollapsed(true));
-  el.chatStrip.addEventListener("click", () => setChatCollapsed(false));
   el.chatScroll.addEventListener("scroll", () => {
     const sc = el.chatScroll;
     const gap = sc.scrollHeight - sc.scrollTop - sc.clientHeight;

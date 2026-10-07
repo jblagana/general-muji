@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)" id="hljs-light"/>
   <link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark"/>
   <link rel="stylesheet" href="/static/vendor/katex.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=165"/>
+  <link rel="stylesheet" href="/static/style.css?v=166"/>
 </head>
 <body>
 <!-- Icon sprite (2026-10-05): one stroke family for the whole UI — Lucide-style
@@ -198,9 +198,6 @@
       </button>
       <div class="topbar-title" id="topbar-title"></div>
       <div class="topbar-actions">
-        <button class="icon-btn" id="chat-collapse" title="Collapse chat" aria-label="Collapse chat">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-        </button>
         <button class="icon-btn" id="preview-toggle" title="Toggle right panel" aria-label="Toggle right panel">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg>
         </button>
@@ -322,13 +319,6 @@
     </button>
   </main>
 
-  <!-- Collapsed chat strip: shows when the main chat area is collapsed -->
-  <button class="chat-strip" id="chat-strip" hidden>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-    <span class="chat-strip-label" id="chat-strip-label">muji</span>
-    <span class="chat-strip-dot" id="chat-strip-dot" hidden></span>
-    <span class="chat-strip-hint">Open chat</span>
-  </button>
 
   <!-- Draggable divider: chat | right panel -->
   <div class="vsplit" id="right-resize" title="Drag to resize · double-click to reset"></div>
@@ -481,6 +471,6 @@
 <script src="/static/vendor/purify.min.js"></script>
 <script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/katex.min.js"></script>
-<script src="/static/app.js?v=182"></script>
+<script src="/static/app.js?v=183"></script>
 </body>
 </html>
