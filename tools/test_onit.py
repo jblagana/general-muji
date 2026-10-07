@@ -1406,6 +1406,25 @@ try:
 except tools.ToolError:
     check("unknown chat raises ToolError", True)
 
+print("── 14. thinking-loop tripwire (480KB Narakeets run, 2026-10-06) ──")
+# the real degeneration: the same 8-word n-gram re-emitted dozens of times
+loop_text = ("Or \"Narakeets\" = \"Narakeets\" = \"Narakeets\" = \"Narakeets\" " * 300)
+check("degenerate loop trips", agent._thinking_loop_hit(loop_text))
+# a long but LEGITIMATE thinking stream must not trip: varied prose that
+# repeats a keyword a few times is normal CoT
+prose = " ".join(
+    f"step {i} considers the tradeoff of approach {i % 7} against the "
+    f"constraint set and moves on to the next candidate" for i in range(200))
+check("legit long thinking does NOT trip", not agent._thinking_loop_hit(prose))
+# short thinking is never a loop, even if repetitive
+check("short repetitive thinking does NOT trip (min_chars)",
+      not agent._thinking_loop_hit("Narakeets = Narakeets = " * 5))
+# a loop that STARTS at the tail (the live shape: clean thinking, then the
+# degeneration kicks in) still trips — the check window is the last 3000 chars
+tail_loop = ("reasoning normally about the problem here " * 30
+             + "Narakeets = Narakeets = " * 120)
+check("tail-onset loop trips", agent._thinking_loop_hit(tail_loop))
+
 print()
 if FAILURES:
     print(f"{len(FAILURES)} FAILURE(S): {FAILURES}")

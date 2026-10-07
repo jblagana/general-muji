@@ -1206,6 +1206,53 @@ def _clear_old_tool_results(messages: list[dict], recent: int) -> int:
     return freed
 
 
+class ThinkingLoop(Exception):
+    """Streaming repetition tripwire: the model's thinking stream degenerated
+    into a token loop (the 480 KB 'Narakeets = Narakeets…' run, 2026-10-06).
+    Raised from the stream loop to abort the round early instead of burning
+    the full token budget on a dead loop that ends with an empty answer."""
+
+
+def _thinking_loop_hit(window: str, min_chars: int = 2000,
+                       min_repeats: int = 5, min_coverage: float = 0.35) -> bool:
+    """True when the tail of the thinking stream is a repetition loop.
+
+    Detects the MINIMAL repeating period of the recent words and requires
+    it to be short (<= 12 words — a degeneration cycle is a phrase, not a
+    paragraph), repeated >= min_repeats times, and covering >= 35% of the
+    window. Why period, not n-gram count: the real 480 KB run cycled a
+    10-word unit ('Or Narakeets = Narakeets…') and an 8-gram only catches
+    one phase of that period (measured: 20% coverage — below any sane
+    threshold), while legitimate CoT that cycles a phrasing a few dozen
+    times has a period far larger than the window. Only evaluated once
+    the stream is long enough (min_chars) — short thinking is never a
+    loop."""
+    if len(window) < min_chars:
+        return False
+    words = re.findall(r"\w+", window[-3000:])
+    n = len(words)
+    if n < 16:
+        return False
+    for p in range(1, 13):
+        if n < p * min_repeats:
+            continue
+        # how far back from the tail does p-periodicity hold? (words[i] ==
+        # words[i-p] for the whole suffix — anchor-free, so a loop that
+        # STARTS mid-window still counts)
+        run = 0
+        for i in range(n - 1, p - 1, -1):
+            if words[i] == words[i - p]:
+                run += 1
+            else:
+                break
+        run += p  # the periodic suffix is `run + p` words long
+        # a degeneration cycle is a SHORT phrase; legitimate CoT cycles are
+        # paragraph-long and never p-periodic within 12 words
+        if run / n >= min_coverage:
+            return True
+    return False
+
+
 def _is_context_overflow(msg: str) -> bool:
     """Message-level check for a context-window rejection (the
     `LLMError` from llm.py carries only `str(e)`). The trigger check
@@ -1791,6 +1838,8 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
             llm_first = None  # TTFT: first model frame (perf_counter)
             llm_last = None  # decode span: first → last CONTENT frame
             think_t0 = len(thinking_text)  # per-round CoT metering (chars)
+            think_loop_tripped = False  # repetition tripwire fired this round
+            think_loop_checked = 0      # thinking chars seen at last tripwire check
             finish_reason: str | None = None  # this round's end event
             usage_tokens = None  # completion_tokens from the final usage chunk
             prompt_tokens = None  # prompt_tokens — the real context size
@@ -1824,6 +1873,21 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                     if ev["type"] == "thinking":
                         thinking_text += ev["text"]
                         yield sse("thinking", {"text": ev["text"]})
+                        # repetition tripwire (the 480 KB 'Narakeets =
+                        # Narakeets…' run, 2026-10-06): check every ~4 KB of
+                        # thinking, cheap enough to run per-chunk. A real
+                        # degeneration re-emits the same n-gram dozens of
+                        # times in a short span — abort the round NOW
+                        # instead of burning the full token budget on a
+                        # dead loop that ends with an empty answer.
+                        if (len(thinking_text) - think_loop_checked >= 4000
+                                and _thinking_loop_hit(thinking_text)):
+                            think_loop_checked = len(thinking_text)
+                            think_loop_tripped = True
+                            raise ThinkingLoop(
+                                f"thinking degenerated into a repetition "
+                                f"loop at {len(thinking_text)} chars")
+                        think_loop_checked = len(thinking_text)
                         continue
                     if ev["type"] == "token":
                         if _llm.mode == "text":
@@ -1873,6 +1937,15 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                         # (choices-less, post finish_reason) — keep draining
                         # until the generator exhausts (it ends right after)
                         continue
+            except ThinkingLoop as e:
+                # the stream is dead: the generator is abandoned mid-iteration
+                # (its cleanup is a no-op — it just stops yielding). The
+                # post-stream code below sees an empty draft + no tool calls;
+                # the tripwire flag diverts to the clarification answer.
+                log("warn", f"session {session_id[:8]}: {e} — round aborted "
+                            f"early (turn {turn})")
+                yield sse("status", {"text": "Thinking loop detected — "
+                                             "aborting this round"})
             except ToolUnsupported as e:
                 log("warn", f"server rejected tools ({e}) — switching to text protocol")
                 _llm.mode = "text"
@@ -2346,6 +2419,17 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                 continue
             # ── no tool calls: this is the final answer ──
             answer = draft.strip()
+            if think_loop_tripped:
+                # the tripwire aborted the round mid-thinking: emit a short
+                # clarification instead of the empty-answer stop (the old
+                # behavior — burn the whole budget, return nothing, leave a
+                # dead 480 KB thinking blob in the DB).
+                answer = ("I got stuck in a repetition loop on that last "
+                          "word and cut the round short — what exactly did "
+                          "you mean? One word back and I'll pick up from "
+                          "there.")
+                log("warn", f"session {session_id[:8]}: loop-tripwire "
+                            f"clarification answer (turn {turn})")
             yield sse("answer_start", {})
             if answer:
                 # TL;DR enforcement (deterministic backstop to TASK_RULES):
