@@ -1102,17 +1102,49 @@ body.resizing-h iframe { pointer-events: none; }
 .aa-item:hover { background: var(--panel-2); }
 .aa-item input { accent-color: var(--accent); margin: 0; }
 
-/* ── main / topbar ── */
+/* ── main / topbar ──
+   V3 restyle (2026-10-08): the bar went from 6 equal controls to 3 —
+   the low-frequency review drawers (learned / tool quirks / latency)
+   tuck into a ⋯ menu. Everything shrunk so the bar reads "label + a
+   few controls" instead of a row of competing buttons. */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
 .topbar {
-  display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px;
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
 .topbar-title {
-  flex: 1; font-size: 13px; color: var(--muted);
+  flex: 1; font-size: 13px; font-weight: 600; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .topbar-actions { display: flex; gap: 2px; }
+/* topbar action buttons: compact 26px squares (icon-btn's default padding
+   is for sidebar rows — override in the bar only) */
+.topbar-actions .icon-btn { padding: 0 6px; min-width: 26px; height: 26px; justify-content: center; }
+/* ⋯ menu: the low-frequency review drawers (learned / tool quirks / latency) */
+.tb-menu-wrap { position: relative; }
+.tb-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  min-width: 190px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--border-strong);
+  border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+}
+.tb-menu[hidden] { display: none; }
+.tb-menu button {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 9px; border: none; border-radius: 6px;
+  background: none; color: var(--text); font-size: 12.5px;
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.tb-menu button:hover { background: var(--panel-2); }
+.tb-menu .mi { font-size: 13px; flex: none; width: 14px; height: 14px; }
+/* pending dot on a menu item (reuses the topbar button's marker, anchored
+   inside the item's bounds) */
+.tb-menu button.has-pending { position: relative; }
+.tb-menu button.has-pending::after {
+  content: ""; position: absolute; top: 6px; right: 8px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 2px var(--panel);
+}
 
 /* ── context meter (topbar, far left): fill of this chat's context vs the
      compaction trigger. Green → amber ≥60% → red ≥85%; dimmed "compacting…"
@@ -1154,6 +1186,34 @@ body.resizing-h iframe { pointer-events: none; }
 .ctx-tip b { font-variant-numeric: tabular-nums; }
 .ctx-tip .sub { color: var(--muted); display: block; margin-top: 2px; }
 .ctx-meter:hover .ctx-tip { display: block; }
+
+/* ── tok/s readout (topbar, right of the context meter) ─────────
+   The last REAL decode speed of this chat: each llm_end frame carries
+   tok_s (computed server-side from the stream span), so this rides the
+   existing SSE stream — zero polling, zero backend. Color dot by speed
+   (thresholds from the boss's last-400-row distribution, 2026-10-08:
+   median 68.7, p10 44.9): green ≥55 = normal, yellow 30–55 = slower
+   than usual, red <30 = degraded. Dims when the reading is >10 s old
+   (a tool-call gap, or the tab was idle) so it reads "last measured,"
+   not "currently." Hidden until the first llm_end of the session. */
+.toks {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  margin-left: 10px;  /* the breathing gap from the ctx meter */
+  font-size: 11px; font-weight: 600;
+  font-family: ui-monospace, Consolas, monospace;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--muted); transition: opacity .3s;
+}
+.toks[hidden] { display: none; }
+.toks .dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: var(--muted);
+}
+.toks b { font-weight: 700; }
+.toks.g { color: var(--ok); }   .toks.g .dot { background: var(--ok); }
+.toks.y { color: var(--warn); } .toks.y .dot { background: var(--warn); }
+.toks.r { color: var(--err); }  .toks.r .dot { background: var(--err); }
+.toks.stale { opacity: .4; }
 
 /* ── collapsed chat: main area hides, a slim strip takes its place ── */
 .app.chat-collapsed .main { display: none; }

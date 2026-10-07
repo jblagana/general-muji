@@ -131,6 +131,8 @@
     sessionList: $("session-list"), rootLine: $("root-line"), modelLine: $("model-line"), restartServer: $("restart-server"),
     topbarTitle: $("topbar-title"), previewToggle: $("preview-toggle"),
     ctxMeter: $("ctx-meter"), ctxFill: $("ctx-fill"), ctxPct: $("ctx-pct"),
+    toks: $("toks"), toksVal: $("toks-val"),
+    tbMenuBtn: $("tb-menu-btn"), tbMenu: $("tb-menu"),
     ctxNum: $("ctx-num"), ctxSub: $("ctx-sub"),
     chatCollapse: $("chat-collapse"), chatStrip: $("chat-strip"),
     chatStripLabel: $("chat-strip-label"), chatStripDot: $("chat-strip-dot"),
@@ -3366,6 +3368,7 @@
           if (s) s.ctx_tokens = d.prompt_tokens;
           renderCtxMeter(d.prompt_tokens, false);
         }
+        renderToks(d.tok_s);  // last real decode speed of this chat
         break;
       case "plan":
         startProgress(d.items || []);
@@ -5075,6 +5078,29 @@
   // died mid-compaction leaves it stuck otherwise).
   function ctxMeterReset() {
     if (el.ctxMeter.classList.contains("compacting")) ctxMeterFromSession();
+  }
+
+  // ── tok/s readout (topbar, right of the ctx meter) ────────────
+  // The last REAL decode speed: each llm_end frame carries tok_s
+  // (server-computed from the stream span). No polling — the number only
+  // moves when a model call finishes, and it dims >10 s after that so a
+  // tool-call gap reads "last measured," not "currently." Color
+  // thresholds from the boss's last-400-row distribution (2026-10-08:
+  // median 68.7, p10 44.9): green ≥55 = normal, yellow 30–55 = slower
+  // than usual, red <30 = degraded.
+  const TOKS_STALE_MS = 10000;
+  let toksStaleTimer = null;
+  function renderToks(tok_s) {
+    if (!tok_s || tok_s <= 0) return;  // no usage chunk / no content — keep last
+    el.toks.hidden = false;
+    el.toksVal.textContent = Math.round(tok_s);
+    el.toks.classList.toggle("g", tok_s >= 55);
+    el.toks.classList.toggle("y", tok_s >= 30 && tok_s < 55);
+    el.toks.classList.toggle("r", tok_s < 30);
+    el.toks.classList.remove("stale");
+    if (toksStaleTimer) clearTimeout(toksStaleTimer);
+    toksStaleTimer = setTimeout(() => el.toks.classList.add("stale"),
+                                 TOKS_STALE_MS);
   }
 
   function resetTree() {
@@ -7082,6 +7108,22 @@
     const cur = document.documentElement.getAttribute("data-theme") || "forest";
     const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
     applyTheme(next);
+  });
+  // ⋯ menu (V3): the low-frequency review drawers. Toggle on click; close
+  // on Escape, outside click, or after an item is chosen.
+  el.tbMenuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    el.tbMenu.hidden = !el.tbMenu.hidden;
+  });
+  document.addEventListener("click", (e) => {
+    if (!el.tbMenu.hidden && !e.target.closest(".tb-menu-wrap"))
+      el.tbMenu.hidden = true;
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !el.tbMenu.hidden) el.tbMenu.hidden = true;
+  });
+  el.tbMenu.querySelectorAll("button").forEach((b) => {
+    b.addEventListener("click", () => { el.tbMenu.hidden = true; });
   });
   el.modeToggle.querySelectorAll(".mode-btn").forEach((b) => {
     b.addEventListener("click", () => {
