@@ -823,6 +823,19 @@ async def api_set_session_cwd(sid: str, body: dict):
     return {"cwd": str(rp)}
 
 
+@app.get("/api/sessions/{sid}/notes")
+async def api_session_notes(sid: str):
+    """This chat's durable task notes (data/sessions/<sid>/task_notes.md) —
+    the file the 📝 button opens in the preview. 404 when the chat has no
+    notes yet (the UI then shows a 'no notes yet' state)."""
+    if not db.get_session(sid):
+        raise HTTPException(404, "unknown session")
+    p = settings.data_dir / "sessions" / sid / "task_notes.md"
+    if not p.is_file():
+        raise HTTPException(404, "no notes yet for this chat")
+    return {"path": str(p), "name": p.name}
+
+
 @app.post("/api/sessions/clear")
 async def api_sessions_clear():
     for sid in list(tasks.runs):

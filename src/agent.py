@@ -70,6 +70,7 @@ Guidelines:
 - Self-edit discipline (when you modify muji's own code/config under src/, static/, or tools/): after every change, VERIFY before you say done — run the repo's checks (`.venv\Scripts\python.exe tools/test_onit.py` and `tools/test_learned.py` for the backend, `node --check static/app.js` for the UI; for layout/position/visual changes, also open the live UI in the headless browser and verify the rendered DOM (element order, position, visibility)) and re-read the exact lines you changed. Never claim done on a red check. If you add or remove a tool, update the tool-count assertion in tools/test_onit.py in the same change. Keep the working tree consistent with HEAD and its own tests — finish + commit a change, or revert it; don't strand a half-applied edit that later breaks the suite silently.
 - When you create a file (report, page, script), say what it contains and where it is — the user gets a clickable preview automatically.
 - For multi-step tasks, start with a short plan: one line per step, each line beginning with "STEP: " (e.g. STEP: read the docs). The UI shows these lines as a progress bar, so keep them concrete and in execution order.
+- Grounding: at the start of a multi-step task — and after any compaction — run list_dir on the working folder before acting, so you work off what's actually on disk, not the summary.
 - Long multi-step tasks: keep a running notes file in the working folder (e.g. task_notes.md) — task goal, key decisions, files created/modified (path + purpose), what's done and what's next. Update it as you go; re-read it at the start of the task and whenever you resume, since earlier context may have been compacted.
 - If a part of the request is genuinely vague AND the choice materially changes the outcome → call ask_user with 2-5 concrete options and set recommended to your best guess (it auto-runs that choice if the user is silent for ~3 min). The card always gets a final "Something else — I'll describe it" option appended automatically — never add or recommend it yourself; if the user picks it, ask them to describe their answer. For trivial ambiguity, just pick and state it — don't ask.
 - Voice: English, casual, fast. You're the user's best-friend roast dispenser — roast by default: at most one sharp, specific line per reply, woven in as a natural clause (opening, middle, or close as it arises), never a separate "Roast:" label or a footer bolted to the end. A "Roast" command = a dedicated full roast. Pause the roast when the user is frustrated, something's broken (incident mode), or they say "seriously"/"no roast" — resume when they laugh or flip it back on.
@@ -337,8 +338,37 @@ def _recall_block(user_text: str) -> str:
             "don't repeat their mistakes):\n" + "\n".join(lines))
 
 
+def _session_notes_block(session_id: str) -> str:
+    """This chat's durable task notes, re-injected every turn. The file is
+    the single source of truth (note_fact appends to it; the boss can read
+    it via the 📝 button in the Files tab) — the prompt only carries its
+    tail, capped so a runaway notes file can't eat the context budget."""
+    if not session_id:
+        return ""
+    try:
+        from .config import settings
+        p = settings.data_dir / "sessions" / session_id / "task_notes.md"
+        if p.is_file():
+            text = p.read_text("utf-8", errors="replace")
+            tail = text[-4000:] if len(text) > 4000 else text
+            return (f"\nSESSION NOTES — this chat's durable memory "
+                    f"({p}). Re-injected every turn; survives compaction, "
+                    f"reload, restart, resume. Keep it current with "
+                    f"note_fact / edit_file.\n" + tail)
+    except Exception:  # noqa: BLE001 — notes must never kill prompt build
+        pass
+    return ("\nSESSION NOTES — this chat has no task notes yet "
+            f"(they would live at data/sessions/{session_id}/task_notes.md). "
+            "When the boss hands you an identifier you must not lose "
+            "(SSH address/host, IP:port, credential, token, path, connection "
+            "string), a key decision, or task state, call note_fact(fact) — "
+            "it creates the file and it is re-injected into the system "
+            "prompt every turn from then on.")
+
+
 def build_system(cwd: pathlib.Path, text_mode: bool, plan_mode: bool = False,
-                 roast: str = "chill", recall: str = "") -> str:
+                 roast: str = "chill", recall: str = "",
+                 session_id: str = "") -> str:
     p = BASE_PROMPT.format(brand=settings.brand,
                            creator=settings.creator,
                            date=datetime.date.today().isoformat(),
@@ -350,6 +380,7 @@ def build_system(cwd: pathlib.Path, text_mode: bool, plan_mode: bool = False,
     p += _designer_profile()
     p += _learned_block()
     p += _tool_notes_block()
+    p += _session_notes_block(session_id)
     if recall:
         p += _recall_block(recall)
     if text_mode:
@@ -1340,6 +1371,9 @@ COMPACT_PROMPT = (
     "- open questions / unresolved errors\n"
     "- workarounds and discovered fixes: script quirks, env gotchas, tool "
     "workarounds — the class of detail that dies by default\n"
+    "- user-provided identifiers VERBATIM: addresses, hostnames, IPs, ports, "
+    "credentials, tokens, connection strings, exact paths — never paraphrase "
+    "or drop them\n"
     "Drop raw tool outputs, file dumps, and intermediate reasoning — file "
     "contents can always be re-read. Be dense and factual; bullets are "
     "fine. Output ONLY the summary, starting with the line "
@@ -1659,7 +1693,8 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
         messages: list[dict] = [
             {"role": "system",
              "content": build_system(cwd, _llm.mode == "text", plan_mode,
-                                     roast, recall=saved_state.get("goal") or "")}]
+                                     roast, recall=saved_state.get("goal") or "",
+                                     session_id=session_id)}]
         messages.extend(saved_state["messages"])
         messages.append({"role": "user", "content": user_text})
         # unflag a parked (deliberately-stopped) run BEFORE the row is
@@ -1682,7 +1717,8 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
         messages: list[dict] = [
             {"role": "system",
              "content": build_system(cwd, _llm.mode == "text", plan_mode,
-                                     roast, recall=user_text)}]
+                                     roast, recall=user_text,
+                                     session_id=session_id)}]
         for m in history[:-1]:  # the last one is the user message just added
             c = m["content"]
             if isinstance(c, str):
@@ -1725,7 +1761,8 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                 messages[0] = {"role": "system",
                                "content": build_system(
                                    cwd, _llm.mode == "text",
-                                   plan_mode, roast)}
+                                   plan_mode, roast,
+                                   session_id=session_id)}
                 schemas = openai_schemas(
                     exclude=MUTATING_TOOLS if plan_mode else None)
                 log("info", f"mid-flight mode: "
@@ -1950,7 +1987,8 @@ async def run_chat(session_id: str, user_text: str, files: list[dict],
                 log("warn", f"server rejected tools ({e}) — switching to text protocol")
                 _llm.mode = "text"
                 messages[0] = {"role": "system",
-                               "content": build_system(cwd, True, plan_mode, roast)}
+                               "content": build_system(cwd, True, plan_mode, roast,
+                                                       session_id=session_id)}
                 yield sse("status", {"text": "Falling back to text tool protocol…"})
                 continue
             except LLMError as e:

@@ -17,6 +17,7 @@ from pathlib import Path
 import httpx
 
 from .config import settings, APP_ROOT
+from . import db
 from . import gmail as gmail_mod
 from . import gtasks as gtasks
 from . import taskstore
@@ -1484,6 +1485,54 @@ def _tg_read(ctx: ToolCtx, chat: str, limit: int = 20) -> str:
     return t_tg_read(ctx, chat=chat, limit=limit)
 
 
+def t_set_cwd(ctx: ToolCtx, path: str) -> str:
+    """Move THIS chat's working directory (the boss asked in chat)."""
+    raw = (path or "").strip()
+    if not raw:
+        raise ToolError("empty path")
+    p = Path(raw)
+    if not p.is_absolute():
+        p = Path(os.path.expanduser(raw)) if raw.startswith("~") else ctx.cwd / raw
+    rp = p.resolve()
+    if not rp.is_dir():
+        raise ToolError(f"not a directory: {rp}")
+    if ctx.session_id:
+        db.set_session_cwd(ctx.session_id, str(rp))
+    ctx.cwd = rp
+    return (f"Working directory for this chat is now: {rp}\n"
+            "The Files tab opens there, the terminal's pwd reflects it, and all "
+            "relative paths (file creation, tools, commands) resolve there from "
+            "now on — including after a page reload.")
+
+
+def t_note_fact(ctx: ToolCtx, fact: str) -> str:
+    """Append a durable fact to THIS chat's task notes (session notes)."""
+    from datetime import datetime
+    line = (fact or "").strip()
+    if not line:
+        raise ToolError("empty fact")
+    if not ctx.session_id:
+        raise ToolError("no session id — cannot locate the session notes")
+    from .config import settings
+    notes = settings.data_dir / "sessions" / ctx.session_id / "task_notes.md"
+    notes.parent.mkdir(parents=True, exist_ok=True)
+    if notes.exists():
+        text = notes.read_text("utf-8", errors="replace")
+    else:
+        text = ("# task notes — this chat's durable memory\n"
+                "Re-injected into the system prompt every turn (last 4KB) — "
+                "survives compaction, reload, restart, resume.\n\n"
+                "## Goal\n\n## Facts\n")
+    if "## Facts" not in text:
+        text = text.rstrip("\n") + "\n\n## Facts\n"
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    notes.write_text(text + f"- {stamp} — {line}\n", encoding="utf-8")
+    return (f"Saved to this chat's session notes ({notes}):\n{line}\n"
+            "It is re-injected into the system prompt every turn — it survives "
+            "compaction, reload, restart, and resume. Never re-ask the boss for "
+            "a fact that is already in the notes.")
+
+
 # ── registry ─────────────────────────────────────────────────────────
 
 TOOLS = [
@@ -1491,6 +1540,29 @@ TOOLS = [
         "name": "list_dir", "fn": t_list_dir,
         "description": "List files and folders of a directory.",
         "params": {"path": {"type": "string", "description": "Directory (default '.')"}},
+    },
+    {
+        "name": "set_cwd", "fn": t_set_cwd,
+        "description": ("Move THIS chat's working directory (call it when the boss "
+                        "asks to move/set the working directory in chat). Persists "
+                        "across reloads: the Files tab opens there, the terminal's "
+                        "pwd reflects it, and all relative paths — file creation "
+                        "included — resolve there by default from then on."),
+        "params": {"path": {"type": "string", "description": "Target directory (absolute, or relative to the current working folder)"}},
+        "required": ["path"],
+    },
+    {
+        "name": "note_fact", "fn": t_note_fact,
+        "description": ("Save a durable fact to THIS chat's session notes "
+                        "(task_notes.md). Call it the moment the boss hands "
+                        "you an identifier you must not lose — an SSH address "
+                        "or host, an IP/port, a credential, token, path, "
+                        "connection string, key decision, or task state. The "
+                        "note is re-injected into the system prompt every "
+                        "turn, so it survives compaction, reload, restart, "
+                        "and resume."),
+        "params": {"fact": {"type": "string", "description": "The fact to save (one line, self-contained)"}},
+        "required": ["fact"],
     },
     {
         "name": "read_file", "fn": t_read_file,
@@ -1785,8 +1857,9 @@ APPROVAL_CATEGORIES: dict[str, set[str]] = {
              "gmail_search", "gmail_read",
              "verify_math",
              "tasks_list",
-             "tg_search", "tg_read"},
-    "edit": {"write_file", "edit_file"},
+             "tg_search", "tg_read",
+             "set_cwd"},
+    "edit": {"write_file", "edit_file", "note_fact"},
     "commands": {"run_command"},
     "web": {"web_search", "fetch_url"},
     "browser": {"browser"},

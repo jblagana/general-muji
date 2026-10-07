@@ -253,7 +253,9 @@ print("── 4. schema sanity (public build: personal tools opt-in) ───�
 # no module reload, which would desync the agent's held references.)
 _default_disabled = config.settings.tools_disabled
 schemas = {s["function"]["name"] for s in tools.openai_schemas()}
-check("core tools advertised by default", len(schemas) == 14, str(len(schemas)))
+check("core tools advertised by default", len(schemas) == 16, str(len(schemas)))
+check("set_cwd + note_fact present by default (session memory, not personal)",
+      {"set_cwd", "note_fact"} <= schemas)
 check("search_transcript present (transcript recall)", "search_transcript" in schemas)
 check("verify_math present (sympy TA-checker)", "verify_math" in schemas)
 check("personal tools OFF by default (opt-in)",
@@ -265,13 +267,71 @@ check("IMAP email tools absent",
 # Opt-IN: an empty disabled set re-enables every tool (24 total).
 config.settings.tools_disabled = frozenset()
 schemas_on = {s["function"]["name"] for s in tools.openai_schemas()}
-check("opt-in (disabled=∅) enables all 24 tools", len(schemas_on) == 24, str(len(schemas_on)))
+check("opt-in (disabled=∅) enables all 26 tools", len(schemas_on) == 26, str(len(schemas_on)))
+check("set_cwd + note_fact present (session memory)",
+      {"set_cwd", "note_fact"} <= schemas_on)
 check("personal tools present when opted in",
       {"tg_search", "tg_read", "gmail_search", "gmail_read",
        "tasks_list", "tasks_add", "tasks_done",
        "events_add", "events_list", "events_done"} <= schemas_on)
 # Restore the default (personal off) for the rest of the suite.
 config.settings.tools_disabled = _default_disabled
+
+print("── 4b. set_cwd (chat-driven working-folder move) ────────────")
+# the boss asks in chat "move the working directory to X" → set_cwd
+# persists it on the session (Files tab + terminal pwd survive reloads)
+# AND re-points ctx.cwd (every later tool + run_command in the run).
+_sid_cwd = db.create_session()["id"]
+_dir_a = _tmp / "work_a"; _dir_a.mkdir(exist_ok=True)
+_dir_b = _tmp / "work_b"; _dir_b.mkdir(exist_ok=True)
+_ctx_cwd = tools.ToolCtx(cwd=_dir_a, session_id=_sid_cwd)
+out = tools.dispatch(_ctx_cwd, "set_cwd", {"path": str(_dir_b)})
+check("set_cwd: result announces the new folder",
+      str(_dir_b) in out and "Working directory" in out, out[:120])
+check("set_cwd: ctx.cwd re-pointed (rest of the run works there)",
+      _ctx_cwd.cwd == _dir_b)
+check("set_cwd: persisted on the session (survives reload)",
+      (db.get_session(_sid_cwd) or {}).get("cwd") == str(_dir_b))
+check("set_cwd: relative path resolves against the current cwd",
+      _ctx_cwd.cwd == _dir_b
+      and tools.dispatch(_ctx_cwd, "set_cwd", {"path": "."}).startswith(
+          "Working directory for this chat is now: " + str(_dir_b)))
+try:
+    tools.dispatch(_ctx_cwd, "set_cwd", {"path": str(_tmp / "nope_missing")})
+    _bad = ""
+except tools.ToolError as e:
+    _bad = str(e)
+check("set_cwd: missing dir is a ToolError", "not a directory" in _bad, _bad)
+
+print("── 4c. note_fact (per-session durable notes) ─────────────────")
+check("note_fact rides the edit category", tools.category_of("note_fact") == "edit")
+check("set_cwd rides the read category", tools.category_of("set_cwd") == "read")
+check("compaction prompt preserves identifiers verbatim",
+      "VERBATIM" in agent.COMPACT_PROMPT and "connection strings" in agent.COMPACT_PROMPT)
+check("base prompt teaches the grounding rule", "Grounding" in agent.BASE_PROMPT)
+_notes_sid = db.create_session()["id"]
+_ctx_n = tools.ToolCtx(cwd=_tmp, session_id=_notes_sid)
+out = tools.dispatch(_ctx_n, "note_fact", {"fact": "ssh: boss@10.0.4.22:2222"})
+_npath = config.settings.data_dir / "sessions" / _notes_sid / "task_notes.md"
+check("note_fact: file created at the fixed per-session path", _npath.is_file())
+check("note_fact: fact appended under ## Facts",
+      "## Facts" in _npath.read_text(encoding="utf-8") and "boss@10.0.4.22:2222" in _npath.read_text(encoding="utf-8"))
+tools.dispatch(_ctx_n, "note_fact", {"fact": "port is 2222, not 22"})
+check("note_fact: second append keeps the first",
+      _npath.read_text(encoding="utf-8").count("- ") >= 2)
+sys_prompt = agent.build_system(_tmp, False, False, "chill", "", session_id=_notes_sid)
+check("build_system injects the session notes",
+      "SESSION NOTES" in sys_prompt and "boss@10.0.4.22:2222" in sys_prompt)
+sys_prompt_empty = agent.build_system(_tmp, False, False, "chill", "",
+                                      session_id=db.create_session()["id"])
+check("build_system: no-notes session gets the hint",
+      "no task notes yet" in sys_prompt_empty)
+try:
+    tools.dispatch(tools.ToolCtx(cwd=_tmp), "note_fact", {"fact": "x"})
+    _nf_bad = ""
+except tools.ToolError as e:
+    _nf_bad = str(e)
+check("note_fact: no session id is a ToolError", "session" in _nf_bad, _nf_bad)
 
 print("── 5. resume E2E (mocked model stream) ───────────────────────")
 import asyncio  # noqa: E402
