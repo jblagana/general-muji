@@ -1990,27 +1990,28 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
   color: var(--muted); font-size: 12.5px; line-height: 1.6;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+/* flat PS-style rows (mockup): prompt + command on one line, muted output
+   below — no card chrome; the prompt is the row's identity */
 .term-block {
-  margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border);
-  border-radius: 9px; background: var(--bg); font-size: 12px;
+  margin-bottom: 2px; font-size: 12px;
+  font-family: ui-monospace, Consolas, monospace;
 }
-.term-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
-.term-tool {
-  font-weight: 700; font-size: 10.5px; text-transform: uppercase;
-  letter-spacing: .08em; color: var(--accent);
+.term-line {
+  display: flex; align-items: baseline; gap: 6px;
+  white-space: pre-wrap; word-break: break-all; line-height: 1.7;
 }
-.term-ms { color: var(--muted); font-size: 10.5px; }
-.term-status { margin-left: auto; font-size: 11px; }
+.term-line .ps {
+  color: var(--accent); font-weight: 700; flex: none;
+}
+.term-line .tc { color: var(--text); }
+.term-ms { color: var(--muted); font-size: 10.5px; flex: none; }
+.term-status { font-size: 11px; font-weight: 700; flex: none; margin-left: 2px; }
 .term-status.ok { color: var(--ok); }
 .term-status.err { color: var(--err); }
-.term-cmd {
-  white-space: pre-wrap; word-break: break-word; margin: 0 0 6px;
-  font-size: 11.5px; color: var(--text);
-}
-.term-cmd::before { content: "$ "; color: var(--muted); }
 .term-out {
   white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--muted);
-  font-size: 11.5px; line-height: 1.5; max-height: 280px; overflow-y: auto;
+  font-size: 12px; line-height: 1.7; max-height: 280px; overflow-y: auto;
+  font-family: ui-monospace, Consolas, monospace;
 }
 /* Cline-style clamp: >5-line outputs collapse to 75px (no scroll — the
    fade is the "there's more" signal); the notch expands to 200px scrollable */
@@ -2148,21 +2149,21 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
 }
 .editor-empty[hidden] { display: none; }
 
-/* user-writable terminal: PowerShell prompt under the tool log */
+/* user-writable terminal: PowerShell prompt under the tool log (mockup —
+   borderless, the prompt + caret are the whole affordance) */
 .term-input-row {
   flex: none; display: flex; align-items: center; gap: 6px;
-  padding: 8px 10px; border-top: 1px solid var(--border);
+  padding: 0 12px 12px;
 }
 .term-ps {
   font-family: ui-monospace, Consolas, monospace; font-size: 12px;
-  color: var(--accent); flex: none;
+  color: var(--accent); font-weight: 700; flex: none;
 }
 #term-input {
-  flex: 1; min-width: 0; background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px;
+  flex: 1; min-width: 0; background: transparent; color: var(--text);
+  border: none; padding: 4px 0;
   font-family: ui-monospace, Consolas, monospace; font-size: 12px; outline: none;
 }
-#term-input:focus { border-color: var(--accent); }
 #term-input::placeholder { color: var(--muted); }
 
 /* ── logs drawer ── */

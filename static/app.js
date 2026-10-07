@@ -169,7 +169,7 @@
     paneFiles: $("rp-pane-files"), paneTerminal: $("rp-pane-terminal"),
     paneThinking: $("rp-pane-thinking"), panePreview: $("rp-pane-preview"),
     paneEditor: $("rp-pane-editor"),
-    termInput: $("term-input"), termRun: $("term-run"),
+    termInput: $("term-input"),
     editorHead: $("editor-head"), editorName: $("editor-name"),
     editorBody: $("editor-body"), editorCode: $("editor-code"),
     editorEmpty: $("editor-empty"),
@@ -4831,38 +4831,42 @@
   function termBlock(t) {
     const div = document.createElement("div");
     div.className = "term-block";
-    const head = document.createElement("div");
-    head.className = "term-head";
-    const tool = document.createElement("span");
-    tool.className = "term-tool";
-    tool.textContent = t.tool || "tool";
-    head.appendChild(tool);
-    if (t.ms != null) {
-      const ms = document.createElement("span");
-      ms.className = "term-ms";
-      ms.textContent = t.ms + " ms";
-      head.appendChild(ms);
-    }
-    const st = document.createElement("span");
-    st.className = "term-status " + (t.ok === false ? "err" : "ok");
-    st.textContent = t.ok === null ? "…" : (t.ok ? "✓" : "✗");
-    head.appendChild(st);
-    div.appendChild(head);
     let cmd = "";
     try {
       const a = JSON.parse(t.args || "{}");
       cmd = a.command || a.path || a.pattern || a.url || a.query || "";
     } catch (e) { cmd = ""; }
     if (!cmd && t.args) cmd = t.args.slice(0, 120);
+    // flat PS-style row (mockup): accent prompt (PS> for shell commands,
+    // the tool name for agent tool calls) + command + status, no card chrome
+    const isCmd = t.tool === "you" || (t.args || "").includes('"command"');
+    const row = document.createElement("div");
+    row.className = "term-line term-cmd-line";
+    const ps = document.createElement("span");
+    ps.className = "ps";
+    ps.textContent = isCmd ? "PS>" : (t.tool || "tool");
+    row.appendChild(ps);
     if (cmd) {
-      const pre = document.createElement("pre");
-      pre.className = "term-cmd";
-      pre.textContent = cmd;
-      div.appendChild(pre);
+      const c = document.createElement("span");
+      c.className = "tc";
+      c.textContent = (isCmd ? " " : "  ") + cmd;
+      row.appendChild(c);
     }
+    const st = document.createElement("span");
+    st.className = "term-status " + (t.ok === false ? "err" : "ok");
+    st.textContent = t.ok === null ? "…" : (t.ok ? "✓" : "✗");
+    row.appendChild(st);
+    if (t.ms != null) {
+      const ms = document.createElement("span");
+      ms.className = "term-ms";
+      ms.textContent = t.ms + " ms";
+      row.appendChild(ms);
+    }
+    div.appendChild(row);
     const p = state.sessionId ? state.panels[state.sessionId] : null;
-    const outText = (t.output || "").trim() || "(no output)";
-    const out = document.createElement("pre");
+    const outText = (t.output || "").trim();
+    if (!outText) return div;
+    const out = document.createElement("div");
     out.className = "term-out";
     out.textContent = outText;
     if (outText.split("\n").length <= 5) {
@@ -4967,7 +4971,6 @@
     const sid = state.sessionId;
     const p = sid ? panel(sid) : null;
     state.termBusy = true;
-    el.termRun.disabled = true;
     const id = "user-" + (++termSeq) + "-" + Date.now();
     if (p) p.term.push({ tool: "you", ok: null, ms: null,
                           args: JSON.stringify({ command: cmd }),
@@ -4992,7 +4995,6 @@
       if (t) { t.ok = ok; t.output = out; }
     }
     state.termBusy = false;
-    el.termRun.disabled = false;
     if (sid === state.sessionId && state.lowerTab === "terminal") {
       renderTerminal();
       el.term.scrollTop = el.term.scrollHeight;
@@ -7112,7 +7114,6 @@
   el.termInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); runUserCommand(); }
   });
-  el.termRun.addEventListener("click", runUserCommand);
   el.rpTreeRefresh.addEventListener("click", () => loadTree());
 // 🗂 = open the folder currently shown in File Explorer
 el.rpTreeReveal.addEventListener("click", () => {
