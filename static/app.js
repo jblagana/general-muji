@@ -5222,18 +5222,13 @@
       nm.appendChild(icon(e.is_dir ? "folder" : (FILE_ICONS[e.kind] || "file")));
       nm.appendChild(document.createTextNode(" " + e.name));
       nm.title = e.path;
-      // two-row layout: name+size on their own full-width row (the path
-      // never gets clipped under the icons), actions stacked below
-      const nmRow = document.createElement("span");
-      nmRow.className = "tr-nmrow";
-      nmRow.appendChild(nm);
+      row.appendChild(nm);
       if (!e.is_dir && e.size != null) {
         const sz = document.createElement("span");
         sz.className = "tr-size";
         sz.textContent = fmtSize(e.size);
-        nmRow.appendChild(sz);
+        row.appendChild(sz);
       }
-      row.appendChild(nmRow);
       // per-row actions (hover): ⧉ copy path, ✏ rename, 🗑 delete,
       // files also ⬇ download
       const acts = document.createElement("span");

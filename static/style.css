@@ -2007,21 +2007,15 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
 }
 .rp-tree-actions { display: flex; gap: 2px; flex: none; padding-left: 2px; }
 .rp-tree { flex: 1; overflow-y: auto; padding: 0 10px 12px; }
-/* Two-row file rows (backlog 2026-10-08): the path gets its own full-width
-   row so long OneDrive paths stop getting clipped under the icon cluster;
-   the actions stack on the row below. Row height is constant whether the
-   actions are shown or not (opacity, not display) — no hover reflow. */
 .tree-row {
-  display: flex; flex-direction: column; gap: 2px; padding: 5px 8px; border-radius: 7px;
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px;
   cursor: pointer; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
 }
 .tree-row:hover { background: var(--panel-2); }
 .tree-row.selected { background: var(--accent-soft); }
-.tree-row .tr-nmrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.tree-row .tr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tree-row .tr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-row .tr-size { margin-left: auto; color: var(--muted); font-size: 11px; flex: none; }
-/* per-row actions (⧉ copy path / ✏ rename / 🗑 delete / ⬇ download) —
-   own row under the path, hover only */
+/* per-row actions in the tree (⧉ copy path / ✏ rename / 🗑 delete / ⬇ download) — hover only */
 .tree-row .tr-acts { display: flex; gap: 2px; flex: none; opacity: 0; transition: opacity .1s; }
 .tree-row:hover .tr-acts, .tree-row.selected .tr-acts { opacity: 1; }
 /* drag & drop highlight: the Files pane while a file is held over it */
