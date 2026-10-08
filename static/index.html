@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)" id="hljs-light"/>
   <link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" id="hljs-dark"/>
   <link rel="stylesheet" href="/static/vendor/katex.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=166"/>
+  <link rel="stylesheet" href="/static/style.css?v=168"/>
 </head>
 <body>
 <!-- Icon sprite (2026-10-05): one stroke family for the whole UI — Lucide-style
@@ -192,7 +192,7 @@
            carries tok_s, computed server-side). Color dot: green ≥55 /
            yellow 30–55 / red <30. Dims >10 s after the last reading so it
            reads "last measured," not "currently" — no polling. -->
-      <span class="toks" id="toks" hidden><i class="dot"></i><b id="toks-val">—</b> tok/s</span>
+      <span class="toks" id="toks" hidden title="Today's tok/s + projection — click to open / click again to close"><i class="dot"></i><b id="toks-val">—</b> tok/s</span>
       <button class="icon-btn" id="sidebar-open" title="Open sidebar" aria-label="Open sidebar" hidden>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
       </button>
@@ -472,6 +472,6 @@
 <script src="/static/vendor/purify.min.js"></script>
 <script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/katex.min.js"></script>
-<script src="/static/app.js?v=183"></script>
+<script src="/static/app.js?v=185"></script>
 </body>
 </html>

@@ -6955,7 +6955,7 @@
     const todayStr = now.getFullYear() + "-" +
       String(now.getMonth() + 1).padStart(2, "0") + "-" +
       String(now.getDate()).padStart(2, "0");
-    const recent = D.days.slice(-14);
+    const recent = D.days.slice(-7);  // 7-day moving window (parked backlog, applied 2026-10-08)
     const proj = [], projN = [];
     for (let h = 0; h < 24; h++) {
       const vals = [];
@@ -7058,7 +7058,7 @@
     el.latVerdict.innerHTML = verdict;
     el.latNote.textContent =
       "Solid bars = today's actual medians so far. Faded bars = projection " +
-      "(14-day weighted median per hour). Dashed line = projected day median. " +
+      "(7-day moving window, round-weighted per hour). Dashed line = projected day median. " +
       "Gray stub = no history that hour. Projection is a historical average, " +
       "not a guarantee — a heavy load right now can still slow things down.";
   }
@@ -7180,10 +7180,22 @@
   }
   el.latOpen.addEventListener("click", openLatDrawer);
   el.latClose.addEventListener("click", closeLatDrawer);
+  // The topbar tok/s readout is a shortcut into the projection tab:
+  // click → open the latency drawer on "today + projection"; click again
+  // (while it's open on that tab) → collapse it.
+  el.toks.addEventListener("click", async () => {
+    if (!el.latDrawer.hidden && latMetric === "day") { closeLatDrawer(); return; }
+    await openLatDrawer();
+    latMetric = "day";
+    el.latToggle.querySelectorAll("button").forEach((x) =>
+      x.classList.toggle("active", x.dataset.metric === "day"));
+    latRender();
+  });
   document.addEventListener("click", (ev) => {
     if (!el.latDrawer.hidden &&
         !el.latDrawer.contains(ev.target) &&
-        ev.target !== el.latOpen)
+        ev.target !== el.latOpen &&
+        !el.toks.contains(ev.target))  // toks is the projection shortcut — its own click handler owns it
       closeLatDrawer();
   });
   // Tab buttons: data-metric drives latMetric; "day" is the 12am-11:59pm

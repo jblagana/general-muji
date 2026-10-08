@@ -1205,6 +1205,9 @@ body.resizing-h iframe { pointer-events: none; }
   color: var(--muted); transition: opacity .3s;
 }
 .toks[hidden] { display: none; }
+/* clickable — opens the latency drawer's "today + projection" tab */
+.toks { cursor: pointer; border-radius: 4px; padding: 2px 4px; margin-left: 6px; }
+.toks:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .toks .dot {
   width: 6px; height: 6px; border-radius: 50%; flex: none;
   background: var(--muted);
@@ -2313,6 +2316,11 @@ span.link-broken { color: var(--muted); text-decoration: line-through; cursor: h
    color-coded cell layout the standalone qwen_latency_day_hour.html used,
    but the data is fetched live from /api/latency on every open. */
 .lat-drawer { width: 560px; max-width: 92vw; }
+/* drop the drawer BELOW the topbar: the tok/s readout (its click-to-open
+   shortcut) lives in the topbar, so the drawer must not cover it — the
+   re-click-to-collapse target has to stay clickable. Topbar is 26px
+   controls + 10px padding + 1px border = 37px. */
+.lat-drawer { top: calc(var(--notch-top, 0px) + 37px); }
 .lat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 14px; }
 .lat-toggle { display: flex; gap: 6px; margin: 4px 0 12px; }
 .lat-toggle button {
