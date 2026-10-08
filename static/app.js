@@ -5222,13 +5222,18 @@
       nm.appendChild(icon(e.is_dir ? "folder" : (FILE_ICONS[e.kind] || "file")));
       nm.appendChild(document.createTextNode(" " + e.name));
       nm.title = e.path;
-      row.appendChild(nm);
+      // two-row layout: name+size on their own full-width row (the path
+      // never gets clipped under the icons), actions stacked below
+      const nmRow = document.createElement("span");
+      nmRow.className = "tr-nmrow";
+      nmRow.appendChild(nm);
       if (!e.is_dir && e.size != null) {
         const sz = document.createElement("span");
         sz.className = "tr-size";
         sz.textContent = fmtSize(e.size);
-        row.appendChild(sz);
+        nmRow.appendChild(sz);
       }
+      row.appendChild(nmRow);
       // per-row actions (hover): ⧉ copy path, ✏ rename, 🗑 delete,
       // files also ⬇ download
       const acts = document.createElement("span");
@@ -6134,6 +6139,12 @@
     el.tzCount.textContent = String(n);
     // v4 drawer: open/closed is the whole state — tab toggles, ✕ closes
     drawer.classList.toggle("open", !tz.collapsed);
+    // While the drawer is open, the composer's sticky bottom bar hides the
+    // drawer's last rows (both paint at z:3, the drawer's box spans the full
+    // viewport height). Hide the composer for the drawer's lifetime — the
+    // drawer is the status surface, the chat is the command surface, and
+    // clicking outside (or the tab / ✕) brings the composer straight back.
+    document.body.classList.toggle("tz-open", !tz.collapsed);
     // signature: skip the body rebuild when nothing changed
     const sig = JSON.stringify([tzDayKey(vd), tz.month && tzDayKey(tz.month), tz.more,
       tasks.map((t) => [t.id, t.done]), upcoming.map((t) => t.id),
