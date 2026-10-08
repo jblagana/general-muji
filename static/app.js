@@ -5072,6 +5072,26 @@
   // than usual, red <30 = degraded.
   const TOKS_STALE_MS = 10000;
   let toksStaleTimer = null;
+  // Boot seed: the readout is hidden until the first llm_end of THIS tab,
+  // so a reload before any model call shows no indicator at all. Seed it
+  // from the latest llm_end across all sessions. Best-effort and
+  // non-blocking — boot must not wait on the full llm_end scan.
+  function seedToks() {
+    fetch("/api/latency", { cache: "no-store" }).then((r) => r.json())
+      .then((D) => {
+        // newest day with data, its last hour with data = the latest reading
+        const lastDay = (D.days || []).filter((d) =>
+          Object.keys(D.n_tok[d] || {}).length).pop();
+        if (!lastDay) return;
+        const hours = Object.keys(D.n_tok[lastDay]).map(Number)
+          .sort((a, b) => a - b);
+        if (!hours.length) return;
+        const h = hours[hours.length - 1];
+        renderToks(D.tok_s[lastDay][h]);
+        // it's a historical reading, not a live one — let the stale dim
+        // do its job (renderToks already armed the 10 s timer)
+      }).catch(() => {});  // server busy — the first llm_end will paint it
+  }
   function renderToks(tok_s) {
     if (!tok_s || tok_s <= 0) return;  // no usage chunk / no content — keep last
     el.toks.hidden = false;
@@ -6665,6 +6685,7 @@
     setLowerTab(state.lowerTab);
     initResizers();
     startStatusPoll();
+    seedToks();            // topbar readout survives a reload (hidden otherwise)
     initWatch();           // the supervisor strip: 5s poll, ghost by default
     initTodayZone();       // option A step 4: Today zone (tasks + mini-cal)
     askNotifyPermission();  // one-time: lets cross-tab "needs you" ping
