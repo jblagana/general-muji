@@ -1994,13 +1994,18 @@ body[data-mode="act"] .input:focus { border-color: var(--act-toggle); box-shadow
   flex: none; padding: 12px 14px 5px; font-size: 11px; letter-spacing: .06em;
   text-transform: uppercase; color: var(--muted);
 }
+/* Two-row header (ratified 2026-10-08, mockup A — port of muji 4b83bfb):
+   path full-width on its own row (wraps, no ellipsis), actions on the row
+   below, always visible. Mirrors the two-row tree rows. */
 .rp-tree-head {
-  display: flex; justify-content: space-between; align-items: center; padding-top: 14px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+  padding-top: 14px;
 }
-.rp-tree-head span:first-child {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.rp-tree-head .tph-path {
+  white-space: normal; word-break: break-all; overflow-wrap: anywhere;
+  overflow: visible; text-overflow: clip;
 }
-.rp-tree-actions { display: flex; gap: 2px; flex: none; }
+.rp-tree-actions { display: flex; gap: 2px; flex: none; padding-left: 2px; }
 .rp-tree { flex: 1; overflow-y: auto; padding: 0 10px 12px; }
 /* Two-row file rows (backlog 2026-10-08): the path gets its own full-width
    row so long OneDrive paths stop getting clipped under the icon cluster;
